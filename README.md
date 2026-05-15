@@ -1,7 +1,7 @@
 # DeviceSecurityKit
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/galahador/DeviceSecurityKit/develop/DSK%20Image.png" width="340" alt="DeviceSecurityKit" />
+  <img src="https://raw.githubusercontent.com/galahador/DeviceSecurityKit/develop/DSK%20Image.png" width="500" alt="DeviceSecurityKit" />
 </p>
 
 ---
