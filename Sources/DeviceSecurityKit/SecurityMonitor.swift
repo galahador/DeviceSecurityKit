@@ -140,22 +140,25 @@ public final class SecurityMonitor: SecurityMonitorType {
         // Run an immediate first check so the caller isn't blind for the first interval
         runChecks()
 
-        monitoringTimer = DispatchSource.makeTimerSource(queue: timerQueue)
-        monitoringTimer?.schedule(
+        let timer = DispatchSource.makeTimerSource(queue: timerQueue)
+        timer.schedule(
             deadline: .now() + monitoringInterval,
             repeating: monitoringInterval
         )
 
-        monitoringTimer?.setEventHandler { [weak self] in
+        timer.setEventHandler { [weak self] in
             self?.runChecks()
         }
 
-        monitoringTimer?.resume()
+        timer.resume()
+        timerQueue.sync { monitoringTimer = timer }
     }
 
     public func stopMonitoring() {
-        monitoringTimer?.cancel()
-        monitoringTimer = nil
+        timerQueue.sync {
+            monitoringTimer?.cancel()
+            monitoringTimer = nil
+        }
         // Bug 6 fix: write needs .barrier.
         stateQueue.sync(flags: .barrier) { isMonitoring = false }
 #if !DEBUG
