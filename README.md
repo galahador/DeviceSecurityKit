@@ -1,8 +1,14 @@
 # DeviceSecurityKit
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/galahador/DeviceSecurityKit-DSK-/develop/DSK%20Image.png" width="340" alt="DeviceSecurityKit" />
+  <img src="https://raw.githubusercontent.com/galahador/DeviceSecurityKit/develop/DSK%20Image.png" width="500" alt="DeviceSecurityKit" />
 </p>
+
+---
+
+## 🚧 Under Construction 🚧 
+
+---
 
 > Lightweight iOS security detection. Zero dependencies. Always free.
 
@@ -40,16 +46,18 @@ Detect jailbreak, debugger, emulator, screen recording, and reverse engineering 
 1. **File → Add Package Dependencies**
 2. Enter the URL:
    ```
-   https://github.com/galahador/DeviceSecurityKit-DSK-.git
+   https://github.com/galahador/DeviceSecurityKit.git
    ```
-3. Set version: `from: "0.16.0"`
+   
+3. Set version: `from: "0.20.0"`
+
 4. Click **Add Package**
 
 ### `Package.swift`
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/galahador/DeviceSecurityKit-DSK-.git", from: "0.16.0")
+    .package(url: "https://github.com/galahador/DeviceSecurityKit.git", from: "0.20.0")
 ]
 ```
 
