@@ -13,6 +13,7 @@ public final class FridaDetector {
 
     private static let logger = SecurityLogger.security(subsystem: "FridaDetector")
     private static let o = StringObfuscator.shared
+    private static let cacheQueue = DispatchQueue(label: "com.devicesecuritykit.frida.cache", attributes: .concurrent)
     private static var _portCheckCache: (date: Date, result: Bool)?
     private static let portCheckCacheInterval: TimeInterval = 60
 
@@ -57,11 +58,12 @@ public final class FridaDetector {
 
     private static func checkFridaPort() -> Bool {
         let now = Date()
-        if let cached = _portCheckCache, now.timeIntervalSince(cached.date) < portCheckCacheInterval {
+        if let cached = cacheQueue.sync(execute: { _portCheckCache }),
+           now.timeIntervalSince(cached.date) < portCheckCacheInterval {
             return cached.result
         }
         let result = performPortCheck()
-        _portCheckCache = (now, result)
+        cacheQueue.sync(flags: .barrier) { _portCheckCache = (now, result) }
         return result
     }
 
