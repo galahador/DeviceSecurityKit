@@ -6,10 +6,6 @@
 
 ---
 
-## 🚧 Under Construction 🚧 
-
----
-
 > Lightweight iOS security detection. Zero dependencies. Always free.
 
 [![Swift 5.9+](https://img.shields.io/badge/Swift-5.9+-F05138?style=flat&logo=swift&logoColor=white)](https://swift.org)
@@ -49,7 +45,7 @@ Detect jailbreak, debugger, emulator, screen recording, and reverse engineering 
    https://github.com/galahador/DeviceSecurityKit.git
    ```
    
-3. Set version: `from: "0.20.0"`
+3. Set version: `from: "0.21.0"`
 
 4. Click **Add Package**
 
@@ -57,7 +53,7 @@ Detect jailbreak, debugger, emulator, screen recording, and reverse engineering 
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/galahador/DeviceSecurityKit.git", from: "0.20.0")
+    .package(url: "https://github.com/galahador/DeviceSecurityKit.git", from: "0.21.0")
 ]
 ```
 
