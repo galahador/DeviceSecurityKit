@@ -83,7 +83,8 @@ public final class AppIntegrityDetector {
                      ?? String(data: data, encoding: .isoLatin1) else { return nil }
 
         guard let startRange = raw.range(of: "<?xml"),
-              let endRange = raw.range(of: "</plist>") else { return nil }
+              let endRange = raw.range(of: "</plist>"),
+              startRange.upperBound <= endRange.lowerBound else { return nil }
 
         let xml = String(raw[startRange.lowerBound..<endRange.upperBound])
         guard let xmlData = xml.data(using: .utf8),
