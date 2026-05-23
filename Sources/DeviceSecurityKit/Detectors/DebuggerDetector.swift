@@ -33,24 +33,28 @@ public final class DebuggerDetector {
     
     public static func startContinuousDenyAttach(interval: TimeInterval = 1.0) {
 #if !DEBUG
-        guard denyAttachTimer == nil else { return }
-        
-        let timer = DispatchSource.makeTimerSource(queue: denyAttachQueue)
-        timer.schedule(deadline: .now(), repeating: interval)
-        timer.setEventHandler {
-            let PT_DENY_ATTACH: Int32 = 31
-            _ = ptrace(PT_DENY_ATTACH, 0, nil, 0)
+        denyAttachQueue.sync {
+            guard denyAttachTimer == nil else { return }
+
+            let timer = DispatchSource.makeTimerSource(queue: denyAttachQueue)
+            timer.schedule(deadline: .now(), repeating: interval)
+            timer.setEventHandler {
+                let PT_DENY_ATTACH: Int32 = 31
+                _ = ptrace(PT_DENY_ATTACH, 0, nil, 0)
+            }
+            timer.resume()
+            denyAttachTimer = timer
         }
-        timer.resume()
-        denyAttachTimer = timer
         logger.debug("Continuous PT_DENY_ATTACH hardening started (interval: \(interval)s)")
 #endif
     }
-    
+
     public static func stopContinuousDenyAttach() {
 #if !DEBUG
-        denyAttachTimer?.cancel()
-        denyAttachTimer = nil
+        denyAttachQueue.sync {
+            denyAttachTimer?.cancel()
+            denyAttachTimer = nil
+        }
         logger.debug("Continuous PT_DENY_ATTACH hardening stopped")
 #endif
     }
@@ -222,7 +226,7 @@ public final class DebuggerDetector {
         let avgTime = measurements.reduce(0 as UInt64) { $0 &+ $1 } / UInt64(measurements.count)
         let elapsed = avgTime * UInt64(timebaseInfo.numer) / UInt64(timebaseInfo.denom)
         
-        let detected = elapsed > 50_000_000
+        let detected = elapsed > 250_000_000
         if detected {
             logger.info("Timing analysis detected slow execution: \(elapsed)ns average")
         }
