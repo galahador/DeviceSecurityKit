@@ -69,7 +69,11 @@ public final class JailbreakDetector {
     }
     
     // MARK: - URL Scheme Checker
-    public static var urlSchemeChecker: ((URL) -> Bool)?
+    private static var _urlSchemeChecker: ((URL) -> Bool)?
+    public static var urlSchemeChecker: ((URL) -> Bool)? {
+        get { detectionQueue.sync { _urlSchemeChecker } }
+        set { detectionQueue.sync(flags: .barrier) { _urlSchemeChecker = newValue } }
+    }
     
     // MARK: - Public
     
@@ -122,7 +126,7 @@ public final class JailbreakDetector {
     }
     
     private static func checkSuspiciousURLSchemes() -> Bool {
-        guard let checker = urlSchemeChecker else { return false }
+        guard let checker = detectionQueue.sync(execute: { _urlSchemeChecker }) else { return false }
         
         for scheme in jailbreakListOptions.urlSchemes {
             if let url = URL(string: scheme), checker(url) {
