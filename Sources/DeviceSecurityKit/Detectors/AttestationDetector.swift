@@ -74,7 +74,10 @@ public final class AttestationDetector {
                 }
                 // Local attestation succeeded; server must still validate before marking clean.
                 logger.info("App Attest key attestation succeeded — send to server for validation")
-                stateQueue.sync(flags: .barrier) { _hasAttempted = true }
+                stateQueue.sync(flags: .barrier) {
+                    _hasAttempted = true
+                    _hasFailed    = false
+                }
                 completion(.success(attestation))
             }
         }
