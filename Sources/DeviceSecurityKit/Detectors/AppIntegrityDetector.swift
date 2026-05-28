@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import CommonCrypto
+import MachO
 
 public final class AppIntegrityDetector {
 
@@ -15,6 +17,8 @@ public final class AppIntegrityDetector {
 
     public static func isIntegrityCompromised(expectedTeamID: String? = nil) -> Bool {
         return checkCodeSignaturePresence()
+            || checkCodeResourcesHashes()
+            || checkMachOCodeSignature()
             || checkProvisioningProfile(expectedTeamID: expectedTeamID)
     }
 
@@ -30,6 +34,92 @@ public final class AppIntegrityDetector {
             return true
         }
         return false
+#endif
+    }
+
+    // MARK: - Check 2: Validate file hashes against CodeResources
+
+    private static func checkCodeResourcesHashes() -> Bool {
+#if targetEnvironment(simulator)
+        return false
+#else
+        let bundlePath = Bundle.main.bundlePath
+        let codeResourcesPath = bundlePath + "/_CodeSignature/CodeResources"
+
+        guard let data = FileManager.default.contents(atPath: codeResourcesPath),
+              let plist = try? PropertyListSerialization.propertyList(
+                  from: data, options: [], format: nil
+              ) as? [String: Any] else {
+            return false // presence check already handles missing file
+        }
+
+        // CodeResources has "files2" dict with SHA256 hashes
+        guard let files2 = plist["files2"] as? [String: Any] else {
+            logger.warning("CodeResources missing files2 dictionary — possible tampering")
+            return true
+        }
+
+        // Validate critical files: Info.plist and the main executable
+        let criticalFiles = buildCriticalFileList()
+
+        for relativePath in criticalFiles {
+            guard let entry = files2[relativePath] as? [String: Any],
+                  let hashData = entry["hash2"] as? Data else {
+                continue // file not in CodeResources — skip (may not be present)
+            }
+
+            let fullPath = bundlePath + "/" + relativePath
+            guard let fileData = FileManager.default.contents(atPath: fullPath) else {
+                continue
+            }
+
+            let computedHash = sha256(fileData)
+            if computedHash != hashData {
+                logger.warning("Hash mismatch for \(relativePath) — file has been modified")
+                return true
+            }
+        }
+
+        return false
+#endif
+    }
+
+    // MARK: - Check 3: Mach-O LC_CODE_SIGNATURE load command
+
+    private static func checkMachOCodeSignature() -> Bool {
+#if targetEnvironment(simulator)
+        return false
+#else
+        guard let executablePath = Bundle.main.executablePath,
+              let executableData = FileManager.default.contents(atPath: executablePath) else {
+            return false
+        }
+
+        return executableData.withUnsafeBytes { rawBuffer -> Bool in
+            guard rawBuffer.count >= MemoryLayout<mach_header_64>.size else { return true }
+
+            let header = rawBuffer.load(as: mach_header_64.self)
+
+            // Verify this is a valid 64-bit Mach-O
+            guard header.magic == MH_MAGIC_64 else { return true }
+
+            var offset = MemoryLayout<mach_header_64>.size
+
+            for _ in 0..<header.ncmds {
+                guard offset + MemoryLayout<load_command>.size <= rawBuffer.count else { break }
+
+                let cmd = rawBuffer.load(fromByteOffset: offset, as: load_command.self)
+
+                if cmd.cmd == LC_CODE_SIGNATURE {
+                    return false // signature found not compromised
+                }
+
+                offset += Int(cmd.cmdsize)
+            }
+
+            logger.warning("LC_CODE_SIGNATURE load command missing — binary may be re-signed or stripped")
+            return true
+        }
 #endif
     }
 
@@ -78,6 +168,27 @@ public final class AppIntegrityDetector {
     }
 
     // MARK: - Helpers
+
+    private static func sha256(_ data: Data) -> Data {
+        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        data.withUnsafeBytes { buffer in
+            _ = CC_SHA256(buffer.baseAddress, CC_LONG(buffer.count), &hash)
+        }
+        return Data(hash)
+    }
+
+    private static func buildCriticalFileList() -> [String] {
+        var files = ["Info.plist"]
+        // Add embedded frameworks' Info.plist entries
+        let frameworksPath = Bundle.main.bundlePath + "/Frameworks"
+        if let frameworks = try? FileManager.default.contentsOfDirectory(atPath: frameworksPath) {
+            for fw in frameworks where fw.hasSuffix(".framework") {
+                files.append("Frameworks/\(fw)/Info.plist")
+            }
+        }
+        return files
+    }
+
     private static func extractPlist(from data: Data) -> [String: Any]? {
         guard let raw = String(data: data, encoding: .ascii)
                      ?? String(data: data, encoding: .isoLatin1) else { return nil }
