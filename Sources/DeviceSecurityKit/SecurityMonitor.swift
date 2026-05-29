@@ -207,7 +207,7 @@ public final class SecurityMonitor: SecurityMonitorType {
         if cfg.pinningBypassDetectionEnabled && CertificatePinningDetector.isPinningBypassed() {
             threats.append(.pinningBypassed)
         }
-        if cfg.vpnProxyDetectionEnabled && VPNProxyDetector.isVPNOrProxyActive() {
+        if cfg.vpnProxyDetectionEnabled && VPNProxyDetector.isVPNOrProxyActive(allowedVPNBundleIDs: cfg.allowedVPNBundleIDs) {
             threats.append(.vpnProxy)
         }
         if cfg.swizzlingDetectionEnabled && SwizzlingDetector.isSwizzled() {

@@ -17,17 +17,30 @@ public final class VPNProxyDetector {
 
     // MARK: - Public
 
-    public static func isVPNOrProxyActive() -> Bool {
-        return checkVPNInterfaces() || checkProxyConfiguration()
+    public static func isVPNOrProxyActive(allowedVPNBundleIDs: [String] = []) -> Bool {
+        return checkVPNInterfaces(allowedBundleIDs: allowedVPNBundleIDs) || checkProxyConfiguration()
     }
 
-    private static func checkVPNInterfaces() -> Bool {
-        let status = NEVPNManager.shared().connection.status
-        if status == .connected || status == .connecting || status == .reasserting {
-            logger.warning("VPN connection detected via NEVPNManager: status \(status.rawValue)")
-            return true
+    private static func checkVPNInterfaces(allowedBundleIDs: [String]) -> Bool {
+        let manager = NEVPNManager.shared()
+        let status = manager.connection.status
+
+        guard status == .connected || status == .connecting || status == .reasserting else {
+            return false
         }
-        return false
+
+        if !allowedBundleIDs.isEmpty,
+           let proto = manager.protocolConfiguration {
+            if let tunnelProto = proto as? NETunnelProviderProtocol,
+               let tunnelBundleID = tunnelProto.providerBundleIdentifier,
+               allowedBundleIDs.contains(tunnelBundleID) {
+                logger.info("VPN connection allowed — bundle ID \(tunnelBundleID) is in allowlist")
+                return false
+            }
+        }
+
+        logger.warning("VPN connection detected via NEVPNManager: status \(status.rawValue)")
+        return true
     }
 
     // MARK: - Check 2: System Proxy Settings
