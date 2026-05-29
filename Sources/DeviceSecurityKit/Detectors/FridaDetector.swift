@@ -14,8 +14,8 @@ public final class FridaDetector {
     private static let logger = SecurityLogger.security(subsystem: "FridaDetector")
     private static let o = StringObfuscator.shared
     private static let cacheQueue = DispatchQueue(label: "com.devicesecuritykit.frida.cache", attributes: .concurrent)
-    private static var _portCheckCache: (date: Date, result: Bool)?
-    private static let portCheckCacheInterval: TimeInterval = 60
+    private static var _portCheckCache: (date: Date, result: Bool, processCount: Int)?
+    private static let portCheckCacheInterval: TimeInterval = 5
 
     // MARK: - Public
     public static func isFridaDetected() -> Bool {
@@ -58,16 +58,45 @@ public final class FridaDetector {
 
     private static func checkFridaPort() -> Bool {
         let now = Date()
+        let currentProcessCount = getProcessCount()
+
         if let cached = cacheQueue.sync(execute: { _portCheckCache }),
-           now.timeIntervalSince(cached.date) < portCheckCacheInterval {
+           now.timeIntervalSince(cached.date) < portCheckCacheInterval,
+           cached.processCount == currentProcessCount {
             return cached.result
         }
+
         let result = performPortCheck()
-        cacheQueue.sync(flags: .barrier) { _portCheckCache = (now, result) }
+        cacheQueue.sync(flags: .barrier) {
+            _portCheckCache = (now, result, currentProcessCount)
+        }
         return result
     }
 
+    private static func getProcessCount() -> Int {
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+        var size: Int = 0
+        guard sysctl(&mib, 4, nil, &size, nil, 0) == 0 else { return -1 }
+        return size / MemoryLayout<kinfo_proc>.stride
+    }
+
+    // Frida default + common alternate ports
+    private static let fridaPorts: [UInt16] = [27042, 27043, 27044, 27045, 1337]
+
     private static func performPortCheck() -> Bool {
+        let ipAddr = inet_addr(o.reveal([0xA4, 0x4D, 0x21, 0x93, 0xB7, 0xBD, 0xCF, 0xF5, 0xB4, 0x6B, 0x1F, 0x17, 0x77]))
+        guard ipAddr != in_addr_t(0xFFFF_FFFF) else { return false }
+
+        for port in fridaPorts {
+            if isPortOpen(port, ipAddr: ipAddr) {
+                logger.warning("Frida server detected: port \(port) is open on localhost")
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func isPortOpen(_ port: UInt16, ipAddr: in_addr_t) -> Bool {
         let sock = socket(AF_INET, SOCK_STREAM, 0)
         guard sock >= 0 else { return false }
         defer { close(sock) }
@@ -76,13 +105,10 @@ public final class FridaDetector {
         guard flags != -1 else { return false }
         _ = fcntl(sock, F_SETFL, flags | O_NONBLOCK)
 
-        let ipAddr = inet_addr(o.reveal([0xA4, 0x4D, 0x21, 0x93, 0xB7, 0xBD, 0xCF, 0xF5, 0xB4, 0x6B, 0x1F, 0x17, 0x77]))
-        guard ipAddr != in_addr_t(0xFFFF_FFFF) else { return false }  // INADDR_NONE
-
         var addr = sockaddr_in()
         addr.sin_len         = UInt8(MemoryLayout<sockaddr_in>.size)
         addr.sin_family      = sa_family_t(AF_INET)
-        addr.sin_port        = UInt16(27042).bigEndian
+        addr.sin_port        = port.bigEndian
         addr.sin_addr.s_addr = ipAddr
 
         let result = withUnsafePointer(to: &addr) {
@@ -91,11 +117,7 @@ public final class FridaDetector {
             }
         }
 
-        if result == 0 {
-            logger.warning("Frida server detected: port 27042 is open on localhost")
-            return true
-        }
-
+        if result == 0 { return true }
         guard result < 0 && errno == EINPROGRESS else { return false }
 
         var pfd = pollfd(fd: sock, events: Int16(POLLOUT | POLLERR), revents: 0)
@@ -106,11 +128,6 @@ public final class FridaDetector {
         var len = socklen_t(MemoryLayout<Int32>.size)
         guard getsockopt(sock, SOL_SOCKET, SO_ERROR, &soError, &len) == 0 else { return false }
 
-        if soError == 0 {
-            logger.warning("Frida server detected: port 27042 is open on localhost")
-            return true
-        }
-
-        return false
+        return soError == 0
     }
 }
