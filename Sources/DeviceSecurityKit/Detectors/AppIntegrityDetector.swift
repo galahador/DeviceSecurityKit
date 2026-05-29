@@ -150,11 +150,9 @@ public final class AppIntegrityDetector {
             }
         }
 
-        // App identifier cross-check
         if let bundleID = Bundle.main.bundleIdentifier,
            let entitlements = plist["Entitlements"] as? [String: Any],
            let appID = entitlements["application-identifier"] as? String {
-            // appID format: "TEAMID.com.example.app" or "TEAMID.*"
             let isWildcard = appID.hasSuffix(".*")
             let matchesBundleID = appID.hasSuffix(".\(bundleID)")
             if !isWildcard && !matchesBundleID {
@@ -190,19 +188,57 @@ public final class AppIntegrityDetector {
     }
 
     private static func extractPlist(from data: Data) -> [String: Any]? {
-        guard let raw = String(data: data, encoding: .ascii)
-                     ?? String(data: data, encoding: .isoLatin1) else { return nil }
+        if let result = extractXMLPlist(from: data) {
+            return result
+        }
+        if let result = extractBinaryPlist(from: data) {
+            return result
+        }
+        return nil
+    }
 
-        guard let startRange = raw.range(of: "<?xml"),
-              let endRange = raw.range(of: "</plist>"),
-              startRange.upperBound <= endRange.lowerBound else { return nil }
+    private static let xmlStartMarker = Data("<?xml".utf8)
+    private static let xmlEndMarker   = Data("</plist>".utf8)
+    private static let bplistMagic    = Data("bplist00".utf8)
 
-        let xml = String(raw[startRange.lowerBound..<endRange.upperBound])
-        guard let xmlData = xml.data(using: .utf8),
-              let plist = try? PropertyListSerialization.propertyList(
-                  from: xmlData, options: [], format: nil
-              ) as? [String: Any] else { return nil }
+    private static func extractXMLPlist(from data: Data) -> [String: Any]? {
+        var searchStart = data.startIndex
 
-        return plist
+        while let startIdx = data.range(of: xmlStartMarker, in: searchStart..<data.endIndex)?.lowerBound {
+            // Find the LAST </plist> after this <?xml to handle nested XML correctly
+            guard let endRange = data.range(of: xmlEndMarker, options: .backwards,
+                                            in: startIdx..<data.endIndex) else {
+                searchStart = data.index(after: startIdx)
+                continue
+            }
+
+            let plistSlice = data[startIdx..<endRange.upperBound]
+            if let plist = try? PropertyListSerialization.propertyList(
+                from: Data(plistSlice), options: [], format: nil
+            ) as? [String: Any] {
+                return plist
+            }
+
+            searchStart = data.index(after: startIdx)
+        }
+
+        return nil
+    }
+
+    private static func extractBinaryPlist(from data: Data) -> [String: Any]? {
+        var searchStart = data.startIndex
+
+        while let startIdx = data.range(of: bplistMagic, in: searchStart..<data.endIndex)?.lowerBound {
+            let remaining = data[startIdx..<data.endIndex]
+            if let plist = try? PropertyListSerialization.propertyList(
+                from: Data(remaining), options: [], format: nil
+            ) as? [String: Any] {
+                return plist
+            }
+
+            searchStart = data.index(after: startIdx)
+        }
+
+        return nil
     }
 }
