@@ -202,34 +202,45 @@ public final class DebuggerDetector {
 #if !DEBUG
         let iterations = 1000
         let sampleCount = 10
-        var measurements = [UInt64]()
-        measurements.reserveCapacity(sampleCount)
 
+        //calibrates for device speed, thermal state, and CPU load.
+        var baselines = [UInt64]()
+        baselines.reserveCapacity(sampleCount)
         for _ in 0..<sampleCount {
-            let startTime = mach_absolute_time()
+            let start = mach_absolute_time()
+            var sink: UInt64 = 0
+            for _ in 0..<iterations {
+                sink &+= mach_absolute_time() & 1
+            }
+            let end = mach_absolute_time()
+            baselines.append(end - start)
+            withUnsafePointer(to: &sink) { _ in }
+        }
 
+        var testTimes = [UInt64]()
+        testTimes.reserveCapacity(sampleCount)
+        for _ in 0..<sampleCount {
+            let start = mach_absolute_time()
             var dummy = 0
             for i in 0..<iterations {
                 dummy = dummy &+ i
             }
-
-            let endTime = mach_absolute_time()
-            measurements.append(endTime - startTime)
-
+            let end = mach_absolute_time()
+            testTimes.append(end - start)
             withUnsafePointer(to: &dummy) { _ in }
         }
 
-        var timebaseInfo = mach_timebase_info()
-        mach_timebase_info(&timebaseInfo)
+        baselines.sort()
+        testTimes.sort()
+        let baselineMedian = baselines[sampleCount / 2]
+        let testMedian = testTimes[sampleCount / 2]
 
-        measurements.sort()
-        let median = measurements[sampleCount / 2]
-        let elapsedNs = median * UInt64(timebaseInfo.numer) / UInt64(timebaseInfo.denom)
+        guard baselineMedian > 0 else { return false }
+        let ratio = testMedian / baselineMedian
 
-        let thresholdNs: UInt64 = 5_000_000
-        let detected = elapsedNs > thresholdNs
+        let detected = ratio > 10
         if detected {
-            logger.info("Timing analysis detected slow execution: \(elapsedNs)ns median")
+            logger.info("Timing analysis: test/baseline ratio \(ratio)x exceeds threshold")
         }
         return detected
 #else
