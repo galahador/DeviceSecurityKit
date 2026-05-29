@@ -45,7 +45,7 @@ Detect jailbreak, debugger, emulator, screen recording, and reverse engineering 
    https://github.com/galahador/DeviceSecurityKit.git
    ```
    
-3. Set version: `from: "0.21.0"`
+3. Set version: `from: "0.22.0"`
 
 4. Click **Add Package**
 
@@ -53,7 +53,7 @@ Detect jailbreak, debugger, emulator, screen recording, and reverse engineering 
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/galahador/DeviceSecurityKit.git", from: "0.21.0")
+    .package(url: "https://github.com/galahador/DeviceSecurityKit.git", from: "0.22.0")
 ]
 ```
 
