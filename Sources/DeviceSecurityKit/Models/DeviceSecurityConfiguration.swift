@@ -18,6 +18,7 @@ public struct DeviceSecurityConfiguration: Equatable {
     public var hookDetectionEnabled: Bool
     public var pinningBypassDetectionEnabled: Bool
     public var vpnProxyDetectionEnabled: Bool
+    public var allowedVPNBundleIDs: [String]
     public var swizzlingDetectionEnabled: Bool
     public var fridaDetectionEnabled: Bool
     public var attestationCheckEnabled: Bool
@@ -33,6 +34,7 @@ public struct DeviceSecurityConfiguration: Equatable {
         hookDetectionEnabled: Bool = true,
         pinningBypassDetectionEnabled: Bool = true,
         vpnProxyDetectionEnabled: Bool = true,
+        allowedVPNBundleIDs: [String] = [],
         swizzlingDetectionEnabled: Bool = true,
         fridaDetectionEnabled: Bool = true,
         attestationCheckEnabled: Bool = false
@@ -47,6 +49,7 @@ public struct DeviceSecurityConfiguration: Equatable {
         self.hookDetectionEnabled = hookDetectionEnabled
         self.pinningBypassDetectionEnabled = pinningBypassDetectionEnabled
         self.vpnProxyDetectionEnabled = vpnProxyDetectionEnabled
+        self.allowedVPNBundleIDs = allowedVPNBundleIDs
         self.swizzlingDetectionEnabled = swizzlingDetectionEnabled
         self.fridaDetectionEnabled = fridaDetectionEnabled
         self.attestationCheckEnabled = attestationCheckEnabled
@@ -122,9 +125,12 @@ public struct DeviceSecurityConfiguration: Equatable {
         return config
     }
 
-    public func withVPNProxyDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
+    public func withVPNProxyDetection(_ enabled: Bool, allowedBundleIDs: [String]? = nil) -> DeviceSecurityConfiguration {
         var config = self
         config.vpnProxyDetectionEnabled = enabled
+        if let ids = allowedBundleIDs {
+            config.allowedVPNBundleIDs = ids
+        }
         return config
     }
 
