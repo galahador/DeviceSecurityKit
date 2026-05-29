@@ -17,6 +17,7 @@ public final class SwizzlingDetector {
 
     public static func isSwizzled() -> Bool {
         return checkSystemMethodOrigins()
+            || checkAppClassIntegrity()
             || checkKnownSwizzlingLibraries()
     }
 
@@ -150,7 +151,56 @@ public final class SwizzlingDetector {
         return false
     }
 
-    // MARK: - Check 2: Known swizzling libraries
+    // MARK: - Check 2: App class IMP integrity scan
+
+    private static func checkAppClassIntegrity() -> Bool {
+#if !targetEnvironment(simulator)
+        guard let appImagePath = Bundle.main.executablePath else { return false }
+        
+        let systemPrefixes = [
+            o.reveal([0xD2, 0x97, 0x19, 0x1B, 0xE7, 0x54, 0x79, 0x8F, 0x81, 0x47, 0x34, 0xF1, 0x7F]),
+            o.reveal([0xAF, 0x7D, 0xE6, 0x83, 0x89, 0x28, 0xFB, 0xF4, 0xB0, 0x0C, 0x5E, 0xCE, 0xE4, 0xCF, 0x82, 0xD8, 0xB0, 0x30, 0xC1, 0x39]),
+            o.reveal([0x85, 0xFD, 0xA6, 0x8E, 0x0C, 0x59, 0xE0, 0x4B, 0x7B, 0x22, 0xB4, 0xFA, 0xF4, 0x24, 0x35, 0xF0, 0x79, 0xBC, 0x7A]),
+        ]
+
+        var classCount: UInt32 = 0
+        guard let classList = objc_copyClassList(&classCount) else { return false }
+        defer { free(UnsafeMutableRawPointer(classList)) }
+
+        for i in 0..<Int(classCount) {
+            let cls = classList[i]
+
+            guard let classImageName = class_getImageName(cls) else { continue }
+            let classImage = String(cString: classImageName)
+            guard classImage == appImagePath else { continue }
+
+            var methodCount: UInt32 = 0
+            guard let methods = class_copyMethodList(cls, &methodCount) else { continue }
+            defer { free(methods) }
+
+            for j in 0..<Int(methodCount) {
+                let imp = method_getImplementation(methods[j])
+                let ptr = unsafeBitCast(imp, to: UnsafeRawPointer.self)
+
+                var info = Dl_info()
+                guard dladdr(ptr, &info) != 0, let fname = info.dli_fname else { continue }
+                let impImage = String(cString: fname)
+
+                if impImage != appImagePath &&
+                   !systemPrefixes.contains(where: { impImage.hasPrefix($0) }) {
+                    let sel = method_getName(methods[j])
+                    let className = NSStringFromClass(cls)
+                    let selName = NSStringFromSelector(sel)
+                    logger.warning("App method swizzled: \(className).\(selName) → \(impImage)")
+                    return true
+                }
+            }
+        }
+#endif
+        return false
+    }
+
+    // MARK: - Check 3: Known swizzling libraries
 
     private static func checkKnownSwizzlingLibraries() -> Bool {
         let suspiciousLibraries = [
