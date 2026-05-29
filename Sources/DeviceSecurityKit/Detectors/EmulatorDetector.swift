@@ -7,6 +7,7 @@
 
 import Foundation
 import Darwin
+import DeviceCheck
 
 public final class EmulatorDetector {
 
@@ -56,7 +57,7 @@ public final class EmulatorDetector {
         // Runtime checks — require >= 2 signals to reduce false positives on real devices
         var detectionMethods: [String] = []
         var confidenceScore: Float = 0.0
-        let maxConfidenceScore: Float = 7.0
+        let maxConfidenceScore: Float = 10.5
 
         if checkSimulatorPaths() {
             detectionMethods.append("simulatorPaths")
@@ -91,6 +92,20 @@ public final class EmulatorDetector {
             confidenceScore += 1.2
             secureLog(publicMessage: "Emulator detected",
                       debugMessage: "Emulator detected via process environment", logger: logger)
+        }
+
+        if checkHardwareIdentifierMismatch() {
+            detectionMethods.append("hardwareIdentifierMismatch")
+            confidenceScore += 2.0
+            secureLog(publicMessage: "Emulator detected",
+                      debugMessage: "Emulator detected via hw.machine vs uname mismatch", logger: logger)
+        }
+
+        if checkDeviceCheckUnsupported() {
+            detectionMethods.append("deviceCheckUnsupported")
+            confidenceScore += 1.5
+            secureLog(publicMessage: "Emulator detected",
+                      debugMessage: "Emulator detected via DeviceCheck unavailability", logger: logger)
         }
 
         let confidence = min(confidenceScore / maxConfidenceScore, 1.0)
@@ -187,12 +202,15 @@ public final class EmulatorDetector {
         return false
     }
 
+    private static let o = StringObfuscator.shared
+
     private static func checkIfSimulatorOnAppleSilicon() -> Bool {
         let processName = ProcessInfo.processInfo.processName
         let environment = ProcessInfo.processInfo.environment
 
         if environment["SIMULATOR_DEVICE_NAME"] != nil ||
-            environment["SIMULATOR_VERSION_INFO"] != nil {
+            environment["SIMULATOR_VERSION_INFO"] != nil ||
+            environment[o.reveal([0xDE, 0x8D, 0x7B, 0x6D, 0x03, 0x36, 0x6B, 0x12, 0x16, 0x34, 0xA5, 0xEE, 0xCA, 0xC8, 0x02, 0xED, 0x39, 0x63])] != nil {
             return true
         }
 
@@ -268,10 +286,51 @@ public final class EmulatorDetector {
         return false
     }
 
+    // MARK: - Hardware Identifier Cross-Reference
+
+    private static func checkHardwareIdentifierMismatch() -> Bool {
+        let sysctlMachine = getSysctlString(o.reveal([0xD6, 0x74, 0x93, 0xE5, 0xD7, 0x68, 0x0F, 0x3A, 0xD8, 0x86, 0x18, 0x68, 0xB9, 0x10]))
+        guard !sysctlMachine.isEmpty else { return false }
+
+        let iphonePrefix = o.reveal([0x07, 0x1B, 0x11, 0x03, 0xAD, 0x2C, 0x36, 0x67, 0xF4, 0x93])
+        let ipadPrefix = o.reveal([0x62, 0xE0, 0x9E, 0x6E, 0xCF, 0xE4, 0x35, 0x88])
+        let ipodPrefix = o.reveal([0xF6, 0xEA, 0xD1, 0xE6, 0x51, 0x3D, 0x43, 0xDD])
+
+        let isRealDevice = sysctlMachine.hasPrefix(iphonePrefix)
+            || sysctlMachine.hasPrefix(ipadPrefix)
+            || sysctlMachine.hasPrefix(ipodPrefix)
+
+        if !isRealDevice {
+            logger.debug("hw.machine returned '\(sysctlMachine)' — not an iOS device identifier")
+            return true
+        }
+
+        return false
+    }
+
+    private static func getSysctlString(_ name: String) -> String {
+        var size: Int = 0
+        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return "" }
+        var buffer = [CChar](repeating: 0, count: size)
+        guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return "" }
+        return String(cString: buffer)
+    }
+
+    // MARK: - DeviceCheck Availability
+
+    private static func checkDeviceCheckUnsupported() -> Bool {
+        if #available(iOS 11.0, *) {
+            if !DCDevice.current.isSupported {
+                logger.debug("DeviceCheck not supported — likely simulator")
+                return true
+            }
+        }
+        return false
+    }
+
     // MARK: - Helper Methods
 
     private static func getDeviceModelIdentifier() -> String {
-        // Fast path: concurrent read — no barrier needed for a simple read.
         if let cached = cacheQueue.sync(execute: { cachedDeviceModel }) {
             return cached
         }
