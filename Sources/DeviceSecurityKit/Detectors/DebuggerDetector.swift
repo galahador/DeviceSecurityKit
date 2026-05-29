@@ -71,7 +71,8 @@ public final class DebuggerDetector {
             ("parentProcess", checkDebuggerWithGetppid()),
             ("environment", checkDebuggerEnvironment()),
             ("timing", checkTimingAnalysis()),
-            ("breakpoint", checkBreakpointDetection())
+            ("breakpoint", checkBreakpointDetection()),
+            ("textIntegrity", checkTextSegmentIntegrity())
         ]
         
 #if DEBUG
@@ -102,7 +103,8 @@ public final class DebuggerDetector {
             "parentProcess": checkDebuggerWithGetppid(),
             "environment": checkDebuggerEnvironment(),
             "timing": checkTimingAnalysis(),
-            "breakpoint": checkBreakpointDetection()
+            "breakpoint": checkBreakpointDetection(),
+            "textIntegrity": checkTextSegmentIntegrity()
         ]
     }
     
@@ -250,29 +252,79 @@ public final class DebuggerDetector {
     
     private static func checkBreakpointDetection() -> Bool {
 #if !DEBUG
-        let functionPtr = unsafeBitCast(checkBreakpointDetection, to: UnsafeRawPointer.self)
-        
+        let targets: [UnsafeRawPointer] = [
+            unsafeBitCast(checkBreakpointDetection as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(checkDebuggerWithSysctl as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(checkDebuggerWithPtrace as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(checkDebuggerWithGetppid as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(checkDebuggerEnvironment as () -> Bool, to: UnsafeRawPointer.self)
+        ]
+
+        let scanDepth = 64
+
+        for funcPtr in targets {
 #if arch(arm64)
-        let instructions = functionPtr.assumingMemoryBound(to: UInt32.self)
-        for i in 0..<4 {
-            let instr = instructions.advanced(by: i).pointee
-            // BRK #imm16 encoding: bits[31:21]=1101_0100_001, bits[4:0]=0_0000
-            if (instr & 0xFFE0001F) == 0xD4200000 {
-                logger.info("ARM64 breakpoint instruction detected")
-                return true
+            let instructions = funcPtr.assumingMemoryBound(to: UInt32.self)
+            for i in 0..<scanDepth {
+                let instr = instructions.advanced(by: i).pointee
+                
+                if (instr & 0xFFE0001F) == 0xD4200000 {
+                    logger.info("ARM64 breakpoint instruction detected")
+                    return true
+                }
+                if instr == 0xD65F03C0 { break }
             }
-        }
 #else
-        // x86/x64: INT3 is a single 0xCC byte
-        let bytes = functionPtr.assumingMemoryBound(to: UInt8.self)
-        for i in 0..<16 {
-            if bytes.advanced(by: i).pointee == 0xCC {
-                logger.info("x86/x64 breakpoint instruction detected")
-                return true
+            let bytes = funcPtr.assumingMemoryBound(to: UInt8.self)
+            for i in 0..<scanDepth {
+                if bytes.advanced(by: i).pointee == 0xCC {
+                    logger.info("x86/x64 breakpoint instruction detected")
+                    return true
+                }
+                if bytes.advanced(by: i).pointee == 0xC3 { break }
             }
-        }
 #endif
-        
+        }
+
+        return false
+#else
+        return false
+#endif
+    }
+
+    // MARK: - Text Segment Integrity Check
+
+    private static func checkTextSegmentIntegrity() -> Bool {
+#if !DEBUG && arch(arm64)
+        guard let header = _dyld_get_image_header(0) else { return false }
+        var size: UInt = 0
+        guard let section = getsectiondata(header, "__TEXT", "__text", &size) else { return false }
+        guard size > 0 else { return false }
+
+        let checkSize = min(Int(size), 4096)
+        let ptr = UnsafeRawPointer(section)
+
+        var sum1: UInt64 = 0
+        for i in 0..<checkSize {
+            sum1 = sum1 &+ UInt64(ptr.load(fromByteOffset: i, as: UInt8.self))
+            sum1 = (sum1 << 1) | (sum1 >> 63) // rotate left
+        }
+
+        var dummy = 0
+        for i in 0..<100 { dummy = dummy &+ i }
+        withUnsafePointer(to: &dummy) { _ in }
+
+        var sum2: UInt64 = 0
+        for i in 0..<checkSize {
+            sum2 = sum2 &+ UInt64(ptr.load(fromByteOffset: i, as: UInt8.self))
+            sum2 = (sum2 << 1) | (sum2 >> 63)
+        }
+
+        if sum1 != sum2 {
+            logger.info("Text segment integrity check failed — possible breakpoint insertion")
+            return true
+        }
+
         return false
 #else
         return false
