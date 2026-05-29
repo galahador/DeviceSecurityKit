@@ -126,20 +126,6 @@ public final class CertificatePinningDetector {
     }
 
     private static func checkProxyConfiguration() -> Bool {
-        guard let rawSettings = CFNetworkCopySystemProxySettings() else { return false }
-        let settings = rawSettings.takeRetainedValue() as NSDictionary
-
-        let httpKey  = o.reveal([0x83, 0x50, 0xE6, 0x48, 0xF8, 0x6B, 0x66, 0x37, 0xD7, 0x23, 0xBA, 0xD3, 0x84, 0xC8])
-        let httpsKey = o.reveal([0xE6, 0x8D, 0x79, 0xA5, 0x50, 0xF1, 0x0A, 0x6D, 0x61, 0x16, 0x43, 0xCA, 0x92, 0x01, 0xD2])
-
-        let httpEnabled  = (settings[httpKey]  as? Int) == 1
-        let httpsEnabled = (settings[httpsKey] as? Int) == 1
-
-        if httpEnabled || httpsEnabled {
-            logger.warning("HTTP/HTTPS proxy detected — possible MITM setup")
-            return true
-        }
-
-        return false
+        return ProxyConfigurationChecker.isProxyConfigured()
     }
 }
