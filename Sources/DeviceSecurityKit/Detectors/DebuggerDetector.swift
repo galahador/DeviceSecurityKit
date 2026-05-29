@@ -143,8 +143,6 @@ public final class DebuggerDetector {
         let ptraceErrno = errno
         errno = originalErrno
         
-        // EPERM means sandbox restriction — not a debugger indicator, ignore it.
-        // EBUSY means the process is already being traced by a debugger.
         let detected = result == -1 && ptraceErrno == EBUSY
         if detected {
             logger.info("ptrace detection triggered with errno: \(ptraceErrno)")
@@ -203,32 +201,35 @@ public final class DebuggerDetector {
     private static func checkTimingAnalysis() -> Bool {
 #if !DEBUG
         let iterations = 1000
-        var measurements: [UInt64] = []
-        measurements.reserveCapacity(5)
-        
-        for _ in 0..<5 {
+        let sampleCount = 10
+        var measurements = [UInt64]()
+        measurements.reserveCapacity(sampleCount)
+
+        for _ in 0..<sampleCount {
             let startTime = mach_absolute_time()
-            
+
             var dummy = 0
             for i in 0..<iterations {
                 dummy = dummy &+ i
             }
-            
+
             let endTime = mach_absolute_time()
             measurements.append(endTime - startTime)
-            
+
             withUnsafePointer(to: &dummy) { _ in }
         }
-        
+
         var timebaseInfo = mach_timebase_info()
         mach_timebase_info(&timebaseInfo)
-        
-        let avgTime = measurements.reduce(0 as UInt64) { $0 &+ $1 } / UInt64(measurements.count)
-        let elapsed = avgTime * UInt64(timebaseInfo.numer) / UInt64(timebaseInfo.denom)
-        
-        let detected = elapsed > 250_000_000
+
+        measurements.sort()
+        let median = measurements[sampleCount / 2]
+        let elapsedNs = median * UInt64(timebaseInfo.numer) / UInt64(timebaseInfo.denom)
+
+        let thresholdNs: UInt64 = 5_000_000
+        let detected = elapsedNs > thresholdNs
         if detected {
-            logger.info("Timing analysis detected slow execution: \(elapsed)ns average")
+            logger.info("Timing analysis detected slow execution: \(elapsedNs)ns median")
         }
         return detected
 #else
