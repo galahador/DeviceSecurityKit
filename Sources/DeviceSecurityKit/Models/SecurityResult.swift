@@ -70,5 +70,9 @@ public struct SecurityResult: Equatable {
         return threats.contains(.dskTampered)
     }
 
+    public var isRepackaged: Bool {
+        return threats.contains(.repackaged)
+    }
+
     public static let secure = SecurityResult(threats: [])
 }

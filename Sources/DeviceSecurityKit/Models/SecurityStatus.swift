@@ -22,6 +22,7 @@ public enum SecurityStatus: Equatable {
     case fridaDetected
     case attestationFailed
     case dskTampered
+    case repackaged
     case compromised
 
     public var isSecure: Bool {
@@ -58,6 +59,8 @@ public enum SecurityStatus: Equatable {
             return "Device integrity attestation failed"
         case .dskTampered:
             return "Security library integrity compromised"
+        case .repackaged:
+            return "App has been resigned with a different certificate"
         case .compromised:
             return "Device is compromised"
         }

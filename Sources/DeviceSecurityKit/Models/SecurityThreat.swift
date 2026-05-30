@@ -21,6 +21,7 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
     case fridaDetected
     case attestationFailed
     case dskTampered
+    case repackaged
     case noThreat
 
     public var description: String {
@@ -51,6 +52,8 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
             return "Device integrity attestation failed"
         case .dskTampered:
             return "Security library integrity compromised"
+        case .repackaged:
+            return "App has been resigned with a different certificate"
         case .noThreat:
             return "App is Secure"
         }
@@ -83,6 +86,8 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
         case .attestationFailed:
             return .critical
         case .dskTampered:
+            return .critical
+        case .repackaged:
             return .critical
         case .noThreat:
             return .normal

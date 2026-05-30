@@ -22,6 +22,8 @@ public struct DeviceSecurityConfiguration: Equatable {
     public var swizzlingDetectionEnabled: Bool
     public var fridaDetectionEnabled: Bool
     public var attestationCheckEnabled: Bool
+    public var antiRepackagingEnabled: Bool
+    public var expectedCertificateHash: String?
 
     public init(
         jailbreakCheckEnabled: Bool = true,
@@ -37,7 +39,9 @@ public struct DeviceSecurityConfiguration: Equatable {
         allowedVPNBundleIDs: [String] = [],
         swizzlingDetectionEnabled: Bool = true,
         fridaDetectionEnabled: Bool = true,
-        attestationCheckEnabled: Bool = false
+        attestationCheckEnabled: Bool = false,
+        antiRepackagingEnabled: Bool = false,
+        expectedCertificateHash: String? = nil
     ) {
         self.jailbreakCheckEnabled = jailbreakCheckEnabled
         self.debuggerCheckEnabled = debuggerCheckEnabled
@@ -53,6 +57,8 @@ public struct DeviceSecurityConfiguration: Equatable {
         self.swizzlingDetectionEnabled = swizzlingDetectionEnabled
         self.fridaDetectionEnabled = fridaDetectionEnabled
         self.attestationCheckEnabled = attestationCheckEnabled
+        self.antiRepackagingEnabled = antiRepackagingEnabled
+        self.expectedCertificateHash = expectedCertificateHash
     }
     
     // MARK: - Presets
@@ -156,6 +162,13 @@ public struct DeviceSecurityConfiguration: Equatable {
     public func withAttestationCheck(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.attestationCheckEnabled = enabled
+        return config
+    }
+
+    public func withAntiRepackagingCheck(_ enabled: Bool, expectedCertificateHash: String? = nil) -> DeviceSecurityConfiguration {
+        var config = self
+        config.antiRepackagingEnabled = enabled
+        config.expectedCertificateHash = expectedCertificateHash
         return config
     }
 }

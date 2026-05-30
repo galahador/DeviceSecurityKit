@@ -223,6 +223,9 @@ public final class SecurityMonitor: SecurityMonitorType {
         if DSKIntegrityChecker.isDSKCompromised() {
             threats.append(.dskTampered)
         }
+        if cfg.antiRepackagingEnabled && RepackagingDetector.isRepackaged(expectedCertificateHash: cfg.expectedCertificateHash) {
+            threats.append(.repackaged)
+        }
 
         return SecurityResult(threats: threats)
     }
@@ -296,6 +299,7 @@ public final class SecurityMonitor: SecurityMonitorType {
         if result.isFridaDetected           { return .fridaDetected }
         if result.isAttestationFailed       { return .attestationFailed }
         if result.isDSKTampered             { return .dskTampered }
+        if result.isRepackaged              { return .repackaged }
         if result.isPinningBypassed         { return .pinningBypassed }
         // High
         if result.isDebuggerAttached        { return .debuggerAttached }
