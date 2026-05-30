@@ -21,6 +21,7 @@ public enum SecurityStatus: Equatable {
     case vpnProxy
     case fridaDetected
     case attestationFailed
+    case dskTampered
     case compromised
 
     public var isSecure: Bool {
@@ -55,6 +56,8 @@ public enum SecurityStatus: Equatable {
             return "Frida instrumentation runtime detected"
         case .attestationFailed:
             return "Device integrity attestation failed"
+        case .dskTampered:
+            return "Security library integrity compromised"
         case .compromised:
             return "Device is compromised"
         }

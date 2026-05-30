@@ -54,6 +54,7 @@ public final class SecurityMonitor: SecurityMonitorType {
 
     public init(configuration: DeviceSecurityConfiguration = .default) {
         self.configuration = configuration
+        DSKIntegrityChecker.captureBaseline()
     }
 
     deinit {
@@ -219,6 +220,9 @@ public final class SecurityMonitor: SecurityMonitorType {
         if cfg.attestationCheckEnabled && AttestationDetector.isAttestationFailed() {
             threats.append(.attestationFailed)
         }
+        if DSKIntegrityChecker.isDSKCompromised() {
+            threats.append(.dskTampered)
+        }
 
         return SecurityResult(threats: threats)
     }
@@ -291,6 +295,7 @@ public final class SecurityMonitor: SecurityMonitorType {
         if result.isMethodSwizzled          { return .methodSwizzled }
         if result.isFridaDetected           { return .fridaDetected }
         if result.isAttestationFailed       { return .attestationFailed }
+        if result.isDSKTampered             { return .dskTampered }
         if result.isPinningBypassed         { return .pinningBypassed }
         // High
         if result.isDebuggerAttached        { return .debuggerAttached }
