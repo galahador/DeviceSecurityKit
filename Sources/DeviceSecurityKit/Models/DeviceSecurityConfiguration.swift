@@ -25,6 +25,7 @@ public struct DeviceSecurityConfiguration: Equatable {
     public var antiRepackagingEnabled: Bool
     public var expectedCertificateHash: String?
     public var screenshotDetectionEnabled: Bool
+    public var dylibInjectionDetectionEnabled: Bool
 
     public init(
         jailbreakCheckEnabled: Bool = true,
@@ -43,7 +44,8 @@ public struct DeviceSecurityConfiguration: Equatable {
         attestationCheckEnabled: Bool = false,
         antiRepackagingEnabled: Bool = false,
         expectedCertificateHash: String? = nil,
-        screenshotDetectionEnabled: Bool = false
+        screenshotDetectionEnabled: Bool = false,
+        dylibInjectionDetectionEnabled: Bool = true
     ) {
         self.jailbreakCheckEnabled = jailbreakCheckEnabled
         self.debuggerCheckEnabled = debuggerCheckEnabled
@@ -62,6 +64,7 @@ public struct DeviceSecurityConfiguration: Equatable {
         self.antiRepackagingEnabled = antiRepackagingEnabled
         self.expectedCertificateHash = expectedCertificateHash
         self.screenshotDetectionEnabled = screenshotDetectionEnabled
+        self.dylibInjectionDetectionEnabled = dylibInjectionDetectionEnabled
     }
     
     // MARK: - Presets
@@ -178,6 +181,12 @@ public struct DeviceSecurityConfiguration: Equatable {
     public func withScreenshotDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.screenshotDetectionEnabled = enabled
+        return config
+    }
+
+    public func withDylibInjectionDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
+        var config = self
+        config.dylibInjectionDetectionEnabled = enabled
         return config
     }
 }

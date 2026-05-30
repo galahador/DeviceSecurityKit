@@ -23,6 +23,7 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
     case dskTampered
     case repackaged
     case screenshotTaken
+    case dylibInjection
     case noThreat
 
     public var description: String {
@@ -57,6 +58,8 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
             return "App has been resigned with a different certificate"
         case .screenshotTaken:
             return "User took a screenshot of the app"
+        case .dylibInjection:
+            return "Unauthorized dynamic library injected into process"
         case .noThreat:
             return "App is Secure"
         }
@@ -94,6 +97,8 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
             return .critical
         case .screenshotTaken:
             return .medium
+        case .dylibInjection:
+            return .critical
         case .noThreat:
             return .normal
         }

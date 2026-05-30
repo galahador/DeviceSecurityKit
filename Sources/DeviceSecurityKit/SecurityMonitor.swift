@@ -234,6 +234,9 @@ public final class SecurityMonitor: SecurityMonitorType {
         if cfg.screenshotDetectionEnabled && ScreenshotDetector.wasScreenshotTaken() {
             threats.append(.screenshotTaken)
         }
+        if cfg.dylibInjectionDetectionEnabled && DylibInjectionDetector.isDylibInjected() {
+            threats.append(.dylibInjection)
+        }
 
         return SecurityResult(threats: threats)
     }
@@ -307,6 +310,7 @@ public final class SecurityMonitor: SecurityMonitorType {
         if result.isFridaDetected           { return .fridaDetected }
         if result.isAttestationFailed       { return .attestationFailed }
         if result.isDSKTampered             { return .dskTampered }
+        if result.isDylibInjected           { return .dylibInjection }
         if result.isRepackaged              { return .repackaged }
         if result.isPinningBypassed         { return .pinningBypassed }
         // High

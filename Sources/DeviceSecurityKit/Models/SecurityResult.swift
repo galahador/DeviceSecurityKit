@@ -78,5 +78,9 @@ public struct SecurityResult: Equatable {
         return threats.contains(.screenshotTaken)
     }
 
+    public var isDylibInjected: Bool {
+        return threats.contains(.dylibInjection)
+    }
+
     public static let secure = SecurityResult(threats: [])
 }
