@@ -21,6 +21,10 @@ public enum SecurityStatus: Equatable {
     case vpnProxy
     case fridaDetected
     case attestationFailed
+    case dskTampered
+    case repackaged
+    case screenshotTaken
+    case dylibInjection
     case compromised
 
     public var isSecure: Bool {
@@ -55,6 +59,14 @@ public enum SecurityStatus: Equatable {
             return "Frida instrumentation runtime detected"
         case .attestationFailed:
             return "Device integrity attestation failed"
+        case .dskTampered:
+            return "Security library integrity compromised"
+        case .repackaged:
+            return "App has been resigned with a different certificate"
+        case .screenshotTaken:
+            return "User took a screenshot of the app"
+        case .dylibInjection:
+            return "Unauthorized dynamic library injected into process"
         case .compromised:
             return "Device is compromised"
         }

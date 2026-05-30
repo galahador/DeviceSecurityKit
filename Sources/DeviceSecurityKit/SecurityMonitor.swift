@@ -54,6 +54,7 @@ public final class SecurityMonitor: SecurityMonitorType {
 
     public init(configuration: DeviceSecurityConfiguration = .default) {
         self.configuration = configuration
+        DSKIntegrityChecker.captureBaseline()
     }
 
     deinit {
@@ -137,6 +138,10 @@ public final class SecurityMonitor: SecurityMonitorType {
         }
 #endif
 
+        if stateQueue.sync(execute: { configuration.screenshotDetectionEnabled }) {
+            ScreenshotDetector.startObserving()
+        }
+
         // Run an immediate first check so the caller isn't blind for the first interval
         runChecks()
 
@@ -164,6 +169,7 @@ public final class SecurityMonitor: SecurityMonitorType {
 #if !DEBUG
         DebuggerDetector.stopContinuousDenyAttach()
 #endif
+        ScreenshotDetector.stopObserving()
     }
 
     // MARK: - Private
@@ -218,6 +224,18 @@ public final class SecurityMonitor: SecurityMonitorType {
         }
         if cfg.attestationCheckEnabled && AttestationDetector.isAttestationFailed() {
             threats.append(.attestationFailed)
+        }
+        if DSKIntegrityChecker.isDSKCompromised() {
+            threats.append(.dskTampered)
+        }
+        if cfg.antiRepackagingEnabled && RepackagingDetector.isRepackaged(expectedCertificateHash: cfg.expectedCertificateHash) {
+            threats.append(.repackaged)
+        }
+        if cfg.screenshotDetectionEnabled && ScreenshotDetector.wasScreenshotTaken() {
+            threats.append(.screenshotTaken)
+        }
+        if cfg.dylibInjectionDetectionEnabled && DylibInjectionDetector.isDylibInjected() {
+            threats.append(.dylibInjection)
         }
 
         return SecurityResult(threats: threats)
@@ -291,6 +309,9 @@ public final class SecurityMonitor: SecurityMonitorType {
         if result.isMethodSwizzled          { return .methodSwizzled }
         if result.isFridaDetected           { return .fridaDetected }
         if result.isAttestationFailed       { return .attestationFailed }
+        if result.isDSKTampered             { return .dskTampered }
+        if result.isDylibInjected           { return .dylibInjection }
+        if result.isRepackaged              { return .repackaged }
         if result.isPinningBypassed         { return .pinningBypassed }
         // High
         if result.isDebuggerAttached        { return .debuggerAttached }
@@ -298,6 +319,7 @@ public final class SecurityMonitor: SecurityMonitorType {
         // Medium
         if result.isEmulator                { return .emulator }
         if result.isVPNOrProxyActive        { return .vpnProxy }
+        if result.isScreenshotTaken         { return .screenshotTaken }
 
         return .compromised
     }

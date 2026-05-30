@@ -66,5 +66,21 @@ public struct SecurityResult: Equatable {
         return threats.contains(.attestationFailed)
     }
 
+    public var isDSKTampered: Bool {
+        return threats.contains(.dskTampered)
+    }
+
+    public var isRepackaged: Bool {
+        return threats.contains(.repackaged)
+    }
+
+    public var isScreenshotTaken: Bool {
+        return threats.contains(.screenshotTaken)
+    }
+
+    public var isDylibInjected: Bool {
+        return threats.contains(.dylibInjection)
+    }
+
     public static let secure = SecurityResult(threats: [])
 }
