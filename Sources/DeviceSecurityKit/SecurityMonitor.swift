@@ -138,6 +138,10 @@ public final class SecurityMonitor: SecurityMonitorType {
         }
 #endif
 
+        if stateQueue.sync(execute: { configuration.screenshotDetectionEnabled }) {
+            ScreenshotDetector.startObserving()
+        }
+
         // Run an immediate first check so the caller isn't blind for the first interval
         runChecks()
 
@@ -165,6 +169,7 @@ public final class SecurityMonitor: SecurityMonitorType {
 #if !DEBUG
         DebuggerDetector.stopContinuousDenyAttach()
 #endif
+        ScreenshotDetector.stopObserving()
     }
 
     // MARK: - Private
@@ -225,6 +230,9 @@ public final class SecurityMonitor: SecurityMonitorType {
         }
         if cfg.antiRepackagingEnabled && RepackagingDetector.isRepackaged(expectedCertificateHash: cfg.expectedCertificateHash) {
             threats.append(.repackaged)
+        }
+        if cfg.screenshotDetectionEnabled && ScreenshotDetector.wasScreenshotTaken() {
+            threats.append(.screenshotTaken)
         }
 
         return SecurityResult(threats: threats)
@@ -307,6 +315,7 @@ public final class SecurityMonitor: SecurityMonitorType {
         // Medium
         if result.isEmulator                { return .emulator }
         if result.isVPNOrProxyActive        { return .vpnProxy }
+        if result.isScreenshotTaken         { return .screenshotTaken }
 
         return .compromised
     }

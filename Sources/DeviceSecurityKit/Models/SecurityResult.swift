@@ -74,5 +74,9 @@ public struct SecurityResult: Equatable {
         return threats.contains(.repackaged)
     }
 
+    public var isScreenshotTaken: Bool {
+        return threats.contains(.screenshotTaken)
+    }
+
     public static let secure = SecurityResult(threats: [])
 }
