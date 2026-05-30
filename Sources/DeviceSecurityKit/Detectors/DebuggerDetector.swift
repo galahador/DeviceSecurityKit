@@ -182,7 +182,7 @@ public final class DebuggerDetector {
         
         let detected = debuggerDetectorList.suspiciousNames.contains(processName.lowercased())
         if detected {
-            logger.info("Suspicious parent process detected: \(processName)")
+            logger.info("Suspicious parent process detected: \(SecurityLogger.redact(processName))")
         }
         
         return detected
@@ -192,7 +192,7 @@ public final class DebuggerDetector {
         for envVar in debuggerDetectorList.suspiciousEnvVars {
             if let value = getenv(envVar) {
                 let envValue = String(cString: value)
-                logger.info("Suspicious environment variable detected: \(envVar)=\(envValue)")
+                logger.info("Suspicious environment variable detected: \(SecurityLogger.redact(envVar))=\(SecurityLogger.redact(envValue))")
                 return true
             }
         }

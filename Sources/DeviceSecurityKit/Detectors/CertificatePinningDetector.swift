@@ -51,13 +51,13 @@ public final class CertificatePinningDetector {
 
             var info = Dl_info()
             guard dladdr(sym, &info) != 0, let fname = info.dli_fname else {
-                logger.warning("Pinning check: cannot resolve image for \(name) — treating as suspicious")
+                logger.warning("Pinning check: cannot resolve image for \(SecurityLogger.redact(name)) — treating as suspicious")
                 return true
             }
 
             let imagePath = String(cString: fname)
             if !imagePath.hasPrefix(expectedPrefix) {
-                logger.warning("Pinning bypass: \(name) redirected to: \(imagePath)")
+                logger.warning("Pinning bypass: \(SecurityLogger.redact(name)) redirected to: \(SecurityLogger.redact(imagePath))")
                 return true
             }
         }
@@ -95,7 +95,7 @@ public final class CertificatePinningDetector {
         let appPath = Bundle.main.executablePath ?? ""
 
         if imagePath != appPath && !systemPrefixes.contains(where: { imagePath.hasPrefix($0) }) {
-            logger.warning("URLSession challenge delegate swizzled to: \(imagePath)")
+            logger.warning("URLSession challenge delegate swizzled to: \(SecurityLogger.redact(imagePath))")
             return true
         }
 
@@ -116,7 +116,7 @@ public final class CertificatePinningDetector {
 
             for lib in bypassLibraries {
                 if imageName.contains(lib.lowercased()) {
-                    logger.warning("SSL bypass library detected: \(imageName)")
+                    logger.warning("SSL bypass library detected: \(SecurityLogger.redact(imageName))")
                     return true
                 }
             }

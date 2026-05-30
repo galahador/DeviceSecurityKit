@@ -55,7 +55,7 @@ internal struct DSKIntegrityChecker {
 
             let imagePath = String(cString: fname)
             if imagePath != dskImagePath {
-                logger.warning("DSK integrity: critical function redirected to \(imagePath)")
+                logger.warning("DSK integrity: critical function redirected to \(SecurityLogger.redact(imagePath))")
                 return true
             }
         }

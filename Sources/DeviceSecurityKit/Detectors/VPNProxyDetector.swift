@@ -34,7 +34,7 @@ public final class VPNProxyDetector {
             if let tunnelProto = proto as? NETunnelProviderProtocol,
                let tunnelBundleID = tunnelProto.providerBundleIdentifier,
                allowedBundleIDs.contains(tunnelBundleID) {
-                logger.info("VPN connection allowed — bundle ID \(tunnelBundleID) is in allowlist")
+                logger.info("VPN connection allowed — bundle ID \(SecurityLogger.redact(tunnelBundleID)) is in allowlist")
                 return false
             }
         }
