@@ -65,7 +65,7 @@ public final class HookDetector {
 
             let imagePath = String(cString: fname)
             if !systemPrefixes.contains(where: { imagePath.hasPrefix($0) }) {
-                logger.warning("Hook detected: function redirected to non-system image: \(imagePath)")
+                logger.warning("Hook detected: function redirected to non-system image: \(SecurityLogger.redact(imagePath))")
                 return true
             }
         }
@@ -99,13 +99,13 @@ public final class HookDetector {
 
             // Frida trampoline: LDR X16, #8 + BR X16
             if first == 0x58000050 && second == 0xD61F0200 {
-                logger.warning("Frida inline hook trampoline detected on: \(name)")
+                logger.warning("Frida inline hook trampoline detected on: \(SecurityLogger.redact(name))")
                 return true
             }
 
             // Generic unconditional branch at function start
             if (first & 0xFC000000) == 0x14000000 {
-                logger.warning("Suspicious unconditional branch at start of: \(name)")
+                logger.warning("Suspicious unconditional branch at start of: \(SecurityLogger.redact(name))")
                 return true
             }
         }

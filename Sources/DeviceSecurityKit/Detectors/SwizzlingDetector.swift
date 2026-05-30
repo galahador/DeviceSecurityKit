@@ -145,12 +145,12 @@ public final class SwizzlingDetector {
         let ptr = unsafeBitCast(imp, to: UnsafeRawPointer.self)
         var info = Dl_info()
         guard dladdr(ptr, &info) != 0, let fname = info.dli_fname else {
-            logger.warning("Swizzle check: could not resolve image for \(label)")
+            logger.warning("Swizzle check: could not resolve image for \(SecurityLogger.redact(label))")
             return true
         }
         let imagePath = String(cString: fname)
         if !systemPrefixes.contains(where: { imagePath.hasPrefix($0) }) {
-            logger.warning("Method swizzling detected: \(label) → \(imagePath)")
+            logger.warning("Method swizzling detected: \(SecurityLogger.redact(label)) → \(SecurityLogger.redact(imagePath))")
             return true
         }
         return false
@@ -196,7 +196,7 @@ public final class SwizzlingDetector {
                     let sel = method_getName(methods[j])
                     let className = NSStringFromClass(cls)
                     let selName = NSStringFromSelector(sel)
-                    logger.warning("App method swizzled: \(className).\(selName) → \(impImage)")
+                    logger.warning("App method swizzled: \(SecurityLogger.redact(className)).\(SecurityLogger.redact(selName)) → \(SecurityLogger.redact(impImage))")
                     return true
                 }
             }
@@ -220,7 +220,7 @@ public final class SwizzlingDetector {
             let imageName = String(cString: rawName).lowercased()
             for lib in suspiciousLibraries {
                 if imageName.contains(lib) {
-                    logger.warning("Known swizzling library detected: \(imageName)")
+                    logger.warning("Known swizzling library detected: \(SecurityLogger.redact(imageName))")
                     return true
                 }
             }

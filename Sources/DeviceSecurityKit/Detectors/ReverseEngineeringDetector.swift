@@ -23,22 +23,22 @@ public final class ReverseEngineeringDetector {
     private static var _isEnvironmentCheckEnabled: Bool = true
     private static var _isCodeIntegrityCheckEnabled: Bool = true
 
-    public static var isDetectionEnabled: Bool {
+    internal static var isDetectionEnabled: Bool {
         get { stateQueue.sync { _isDetectionEnabled } }
         set { stateQueue.sync(flags: .barrier) { _isDetectionEnabled = newValue } }
     }
 
-    public static var isLibraryCheckEnabled: Bool {
+    internal static var isLibraryCheckEnabled: Bool {
         get { stateQueue.sync { _isLibraryCheckEnabled } }
         set { stateQueue.sync(flags: .barrier) { _isLibraryCheckEnabled = newValue } }
     }
 
-    public static var isEnvironmentCheckEnabled: Bool {
+    internal static var isEnvironmentCheckEnabled: Bool {
         get { stateQueue.sync { _isEnvironmentCheckEnabled } }
         set { stateQueue.sync(flags: .barrier) { _isEnvironmentCheckEnabled = newValue } }
     }
 
-    public static var isCodeIntegrityCheckEnabled: Bool {
+    internal static var isCodeIntegrityCheckEnabled: Bool {
         get { stateQueue.sync { _isCodeIntegrityCheckEnabled } }
         set { stateQueue.sync(flags: .barrier) { _isCodeIntegrityCheckEnabled = newValue } }
     }

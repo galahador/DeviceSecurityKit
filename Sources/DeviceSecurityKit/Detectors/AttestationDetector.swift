@@ -49,7 +49,7 @@ public final class AttestationDetector {
 
         DCAppAttestService.shared.generateKey { keyId, error in
             if let error {
-                logger.warning("Key generation failed: \(error.localizedDescription)")
+                logger.warning("Key generation failed: \(SecurityLogger.redact(error.localizedDescription))")
                 recordFailure()
                 completion(.failure(.keyGenerationFailed(underlying: error)))
                 return
@@ -62,7 +62,7 @@ public final class AttestationDetector {
 
             DCAppAttestService.shared.attestKey(keyId, clientDataHash: challengeHash) { attestation, error in
                 if let error {
-                    logger.warning("Key attestation failed: \(error.localizedDescription)")
+                    logger.warning("Key attestation failed: \(SecurityLogger.redact(error.localizedDescription))")
                     recordFailure()
                     completion(.failure(.attestationFailed(underlying: error)))
                     return

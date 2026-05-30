@@ -54,7 +54,7 @@ public final class DylibInjectionDetector {
             let path = String(cString: name)
 
             if !isExpectedImagePath(path, appBundlePath: appBundlePath) {
-                logger.warning("Dylib injection: unexpected loaded image: \(path)")
+                logger.warning("Dylib injection: unexpected loaded image: \(SecurityLogger.redact(path))")
                 return true
             }
         }
@@ -99,7 +99,7 @@ public final class DylibInjectionDetector {
                 let dylibPath = String(cString: namePtr)
 
                 if !isExpectedDylibPath(dylibPath) {
-                    logger.warning("Dylib injection: unexpected LC_LOAD_DYLIB: \(dylibPath)")
+                    logger.warning("Dylib injection: unexpected LC_LOAD_DYLIB: \(SecurityLogger.redact(dylibPath))")
                     return true
                 }
             }

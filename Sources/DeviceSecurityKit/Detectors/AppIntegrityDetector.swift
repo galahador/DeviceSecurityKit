@@ -75,7 +75,7 @@ public final class AppIntegrityDetector {
 
             let computedHash = sha256(fileData)
             if computedHash != hashData {
-                logger.warning("Hash mismatch for \(relativePath) — file has been modified")
+                logger.warning("Hash mismatch for \(SecurityLogger.redact(relativePath)) — file has been modified")
                 return true
             }
         }
@@ -145,7 +145,7 @@ public final class AppIntegrityDetector {
                 return true
             }
             guard teamIDs.contains(expected) else {
-                logger.warning("Team ID mismatch: expected \(expected), found \(teamIDs)")
+                logger.warning("Team ID mismatch: expected \(SecurityLogger.redact(expected)), found \(SecurityLogger.redact(teamIDs.joined(separator: ",")))")
                 return true
             }
         }
@@ -156,7 +156,7 @@ public final class AppIntegrityDetector {
             let isWildcard = appID.hasSuffix(".*")
             let matchesBundleID = appID.hasSuffix(".\(bundleID)")
             if !isWildcard && !matchesBundleID {
-                logger.warning("App identifier mismatch: profile has \(appID), bundle is \(bundleID)")
+                logger.warning("App identifier mismatch: profile has \(SecurityLogger.redact(appID)), bundle is \(SecurityLogger.redact(bundleID))")
                 return true
             }
         }

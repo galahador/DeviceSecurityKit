@@ -31,14 +31,14 @@ internal struct ProxyConfigurationChecker {
 
         for key in enableKeys {
             if (settings[key] as? Int) == 1 {
-                logger.warning("Proxy enabled — key: \(key)")
+                logger.warning("Proxy enabled — key: \(SecurityLogger.redact(key))")
                 return true
             }
         }
 
         for key in hostKeys {
             if let host = settings[key] as? String, !host.isEmpty {
-                logger.warning("Proxy host configured — key: \(key), host: \(host)")
+                logger.warning("Proxy host configured — key: \(SecurityLogger.redact(key)), host: \(SecurityLogger.redact(host))")
                 return true
             }
         }

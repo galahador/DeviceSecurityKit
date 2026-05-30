@@ -9,9 +9,16 @@ import Foundation
 
 public struct SecurityResult: Equatable {
     public let threats: [SecurityThreat]
-    
-    public init(threats: [SecurityThreat] = []) {
+    public let evidence: [SecurityThreat: [String]]
+
+    public init(threats: [SecurityThreat] = [], evidence: [SecurityThreat: [String]] = [:]) {
         self.threats = threats
+        self.evidence = evidence
+    }
+
+    /// Returns the evidence strings for a specific threat, or empty if none.
+    public func evidence(for threat: SecurityThreat) -> [String] {
+        return evidence[threat] ?? []
     }
     
     public var isSecure: Bool {

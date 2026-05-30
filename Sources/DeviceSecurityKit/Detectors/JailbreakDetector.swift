@@ -33,44 +33,44 @@ public final class JailbreakDetector {
     private static var _isEnvironmentVarCheckEnabled: Bool = true
     private static var _isPrebootCheckEnabled: Bool = true
     
-    public static var isFileCheckEnabled: Bool {
+    internal static var isFileCheckEnabled: Bool {
         get { detectionQueue.sync { _isFileCheckEnabled } }
         set { detectionQueue.sync(flags: .barrier) { _isFileCheckEnabled = newValue } }
     }
     
-    public static var isSandboxCheckEnabled: Bool {
+    internal static var isSandboxCheckEnabled: Bool {
         get { detectionQueue.sync { _isSandboxCheckEnabled } }
         set { detectionQueue.sync(flags: .barrier) { _isSandboxCheckEnabled = newValue } }
     }
     
-    public static var isForkCheckEnabled: Bool {
+    internal static var isForkCheckEnabled: Bool {
         get { detectionQueue.sync { _isForkCheckEnabled } }
         set { detectionQueue.sync(flags: .barrier) { _isForkCheckEnabled = newValue } }
     }
     
-    public static var isURLSchemeCheckEnabled: Bool {
+    internal static var isURLSchemeCheckEnabled: Bool {
         get { detectionQueue.sync { _isURLSchemeCheckEnabled } }
         set { detectionQueue.sync(flags: .barrier) { _isURLSchemeCheckEnabled = newValue } }
     }
     
-    public static var isSymbolicLinkCheckEnabled: Bool {
+    internal static var isSymbolicLinkCheckEnabled: Bool {
         get { detectionQueue.sync { _isSymbolicLinkCheckEnabled } }
         set { detectionQueue.sync(flags: .barrier) { _isSymbolicLinkCheckEnabled = newValue } }
     }
     
-    public static var isEnvironmentVarCheckEnabled: Bool {
+    internal static var isEnvironmentVarCheckEnabled: Bool {
         get { detectionQueue.sync { _isEnvironmentVarCheckEnabled } }
         set { detectionQueue.sync(flags: .barrier) { _isEnvironmentVarCheckEnabled = newValue } }
     }
     
-    public static var isPrebootCheckEnabled: Bool {
+    internal static var isPrebootCheckEnabled: Bool {
         get { detectionQueue.sync { _isPrebootCheckEnabled } }
         set { detectionQueue.sync(flags: .barrier) { _isPrebootCheckEnabled = newValue } }
     }
     
     // MARK: - URL Scheme Checker
     private static var _urlSchemeChecker: ((URL) -> Bool)?
-    public static var urlSchemeChecker: ((URL) -> Bool)? {
+    internal static var urlSchemeChecker: ((URL) -> Bool)? {
         get { detectionQueue.sync { _urlSchemeChecker } }
         set { detectionQueue.sync(flags: .barrier) { _urlSchemeChecker = newValue } }
     }
@@ -95,6 +95,26 @@ public final class JailbreakDetector {
         || (preboot  && checkPrebootJailbreakPaths())
     }
     
+    public static func getDetectionDetails() -> [String] {
+        guard isDetectionEnabled else { return [] }
+
+        let (file, sandbox, fork, url, symlink, env, preboot) = detectionQueue.sync {
+            (_isFileCheckEnabled, _isSandboxCheckEnabled, _isForkCheckEnabled,
+             _isURLSchemeCheckEnabled, _isSymbolicLinkCheckEnabled,
+             _isEnvironmentVarCheckEnabled, _isPrebootCheckEnabled)
+        }
+
+        var methods: [String] = []
+        if file     && checkJailbreakFiles()          { methods.append("jailbreakFiles") }
+        if sandbox  && checkSandboxIntegrity()        { methods.append("sandboxIntegrity") }
+        if fork     && checkForkCapability()          { methods.append("forkCapability") }
+        if url      && checkSuspiciousURLSchemes()    { methods.append("suspiciousURLSchemes") }
+        if symlink  && checkSymbolicLinks()           { methods.append("symbolicLinks") }
+        if env      && checkSuspiciousEnvironmentVars() { methods.append("environmentVars") }
+        if preboot  && checkPrebootJailbreakPaths()   { methods.append("prebootPaths") }
+        return methods
+    }
+
     // MARK: - Private Detection Methods
     
     private static func checkJailbreakFiles() -> Bool {

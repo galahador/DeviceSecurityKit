@@ -184,16 +184,24 @@ public final class SecurityMonitor: SecurityMonitorType {
     private func gatherThreats() -> SecurityResult {
         let (cfg, provider) = stateQueue.sync { (configuration, _screenRecordingProvider) }
         var threats: [SecurityThreat] = []
+        var evidence: [SecurityThreat: [String]] = [:]
 
         if cfg.jailbreakCheckEnabled && JailbreakDetector.isJailbroken() {
             threats.append(.jailbreak)
+            evidence[.jailbreak] = JailbreakDetector.getDetectionDetails()
         }
         if cfg.debuggerCheckEnabled && DebuggerDetector.isDebuggerAttached() {
             threats.append(.debugger)
+            let results = DebuggerDetector.getDetectionResults()
+            evidence[.debugger] = results.filter { $0.value }.map { $0.key }
         }
         #if !DEBUG
-        if cfg.emulatorCheckEnabled && EmulatorDetector.isEmulator() {
-            threats.append(.emulator)
+        if cfg.emulatorCheckEnabled {
+            let result = EmulatorDetector.detectEmulator()
+            if result.isEmulator {
+                threats.append(.emulator)
+                evidence[.emulator] = result.detectionMethods
+            }
         }
         #endif
         if cfg.reverseEngineeringCheckEnabled && ReverseEngineeringDetector.isReverseEngineered() {
@@ -238,7 +246,7 @@ public final class SecurityMonitor: SecurityMonitorType {
             threats.append(.dylibInjection)
         }
 
-        return SecurityResult(threats: threats)
+        return SecurityResult(threats: threats, evidence: evidence)
     }
 
     private func applyResult(_ result: SecurityResult) -> (
