@@ -53,8 +53,16 @@ public struct SecurityResult: Equatable {
         return threats.contains(.pinningBypassed)
     }
 
+    public var isVPNDetected: Bool {
+        return threats.contains(.vpnDetected)
+    }
+
+    public var isProxyDetected: Bool {
+        return threats.contains(.proxyDetected)
+    }
+
     public var isVPNOrProxyActive: Bool {
-        return threats.contains(.vpnProxy)
+        return isVPNDetected || isProxyDetected
     }
 
     public var isAppIntegrityCompromised: Bool {

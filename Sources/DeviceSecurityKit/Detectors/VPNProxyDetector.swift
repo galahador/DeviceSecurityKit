@@ -17,8 +17,16 @@ public final class VPNProxyDetector {
 
     // MARK: - Public
 
+    public static func isVPNActive(allowedVPNBundleIDs: [String] = []) -> Bool {
+        return checkVPNInterfaces(allowedBundleIDs: allowedVPNBundleIDs)
+    }
+
+    public static func isProxyActive() -> Bool {
+        return checkProxyConfiguration()
+    }
+
     public static func isVPNOrProxyActive(allowedVPNBundleIDs: [String] = []) -> Bool {
-        return checkVPNInterfaces(allowedBundleIDs: allowedVPNBundleIDs) || checkProxyConfiguration()
+        return isVPNActive(allowedVPNBundleIDs: allowedVPNBundleIDs) || isProxyActive()
     }
 
     private static func checkVPNInterfaces(allowedBundleIDs: [String]) -> Bool {

@@ -37,7 +37,7 @@ internal struct DSKIntegrityChecker {
         let criticalFunctions: [UnsafeRawPointer] = [
             unsafeBitCast(JailbreakDetector.isJailbroken as () -> Bool, to: UnsafeRawPointer.self),
             unsafeBitCast(DebuggerDetector.isDebuggerAttached as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(FridaDetector.isFridaDetected as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(FridaDetector.isFridaDetected as (Bool, [UInt16]?) -> Bool, to: UnsafeRawPointer.self),
             unsafeBitCast(HookDetector.isFunctionHooked as () -> Bool, to: UnsafeRawPointer.self),
             unsafeBitCast(SwizzlingDetector.isSwizzled as () -> Bool, to: UnsafeRawPointer.self),
             unsafeBitCast(CertificatePinningDetector.isPinningBypassed as () -> Bool, to: UnsafeRawPointer.self),

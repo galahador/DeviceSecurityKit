@@ -226,9 +226,15 @@ public final class SecurityMonitor: SecurityMonitorType {
             threats.append(.pinningBypassed)
             evidence[.pinningBypassed] = ["pinningBypassDetected"]
         }
-        if cfg.vpnProxyDetectionEnabled && VPNProxyDetector.isVPNOrProxyActive(allowedVPNBundleIDs: cfg.allowedVPNBundleIDs) {
-            threats.append(.vpnProxy)
-            evidence[.vpnProxy] = ["vpnOrProxyActive"]
+        if cfg.vpnProxyDetectionEnabled {
+            if VPNProxyDetector.isVPNActive(allowedVPNBundleIDs: cfg.allowedVPNBundleIDs) {
+                threats.append(.vpnDetected)
+                evidence[.vpnDetected] = ["vpnConnectionActive"]
+            }
+            if VPNProxyDetector.isProxyActive() {
+                threats.append(.proxyDetected)
+                evidence[.proxyDetected] = ["proxyConfigured"]
+            }
         }
         if cfg.swizzlingDetectionEnabled && SwizzlingDetector.isSwizzled() {
             threats.append(.methodSwizzling)
@@ -339,7 +345,8 @@ public final class SecurityMonitor: SecurityMonitorType {
         if result.isScreenRecorded          { return .screenRecording }
         // Medium
         if result.isEmulator                { return .emulator }
-        if result.isVPNOrProxyActive        { return .vpnProxy }
+        if result.isVPNDetected              { return .vpnDetected }
+        if result.isProxyDetected            { return .proxyDetected }
         if result.isScreenshotTaken         { return .screenshotTaken }
 
         return .compromised

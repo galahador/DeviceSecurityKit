@@ -18,7 +18,8 @@ public enum SecurityStatus: Equatable {
     case hooked
     case methodSwizzled
     case pinningBypassed
-    case vpnProxy
+    case vpnDetected
+    case proxyDetected
     case fridaDetected
     case attestationFailed
     case dskTampered
@@ -53,8 +54,10 @@ public enum SecurityStatus: Equatable {
             return "Objective-C method swizzling detected"
         case .pinningBypassed:
             return "Certificate pinning has been bypassed"
-        case .vpnProxy:
-            return "VPN or proxy connection is active"
+        case .vpnDetected:
+            return "VPN connection is active"
+        case .proxyDetected:
+            return "Proxy configuration is active"
         case .fridaDetected:
             return "Frida instrumentation runtime detected"
         case .attestationFailed:
