@@ -14,20 +14,8 @@ public final class DebuggerDetector {
     private static let logger = SecurityLogger.security(subsystem: "DebuggerDetector")
     private static let debuggerDetectorList = DebuggerDetectorList()
     
-    private static let detectionQueue = DispatchQueue(label: "DebuggerDetector.detection", attributes: .concurrent)
-    private static var _isDetectionEnabled: Bool = true
-    
     private static let denyAttachQueue = DispatchQueue(label: "DebuggerDetector.denyAttach", qos: .background)
     private static var denyAttachTimer: DispatchSourceTimer?
-    
-    internal static var isDetectionEnabled: Bool {
-        get {
-            return detectionQueue.sync { _isDetectionEnabled }
-        }
-        set {
-            detectionQueue.sync(flags: .barrier) { _isDetectionEnabled = newValue }
-        }
-    }
     
     // MARK: - Continuous PT_DENY_ATTACH Hardening
     
@@ -60,11 +48,6 @@ public final class DebuggerDetector {
     }
     
     public static func isDebuggerAttached() -> Bool {
-        guard isDetectionEnabled else {
-            logger.debug("Debugger detection is disabled")
-            return false
-        }
-        
         let detectionResults = [
             ("sysctl", checkDebuggerWithSysctl()),
             ("ptrace", checkDebuggerWithPtrace()),
@@ -93,10 +76,6 @@ public final class DebuggerDetector {
     }
     
     public static func getDetectionResults() -> [String: Bool] {
-        guard isDetectionEnabled else {
-            return [:]
-        }
-        
         return [
             "sysctl": checkDebuggerWithSysctl(),
             "ptrace": checkDebuggerWithPtrace(),

@@ -14,6 +14,7 @@ public struct DeviceSecurityConfiguration: Equatable {
     public var reverseEngineeringCheckEnabled: Bool
     public var appIntegrityCheckEnabled: Bool
     public var expectedTeamID: String?
+    public var expectedFileHashes: [String: String]
     public var screenRecordingCheckEnabled: Bool
     public var hookDetectionEnabled: Bool
     public var pinningBypassDetectionEnabled: Bool
@@ -36,6 +37,7 @@ public struct DeviceSecurityConfiguration: Equatable {
         reverseEngineeringCheckEnabled: Bool = true,
         appIntegrityCheckEnabled: Bool = true,
         expectedTeamID: String? = nil,
+        expectedFileHashes: [String: String] = [:],
         screenRecordingCheckEnabled: Bool = true,
         hookDetectionEnabled: Bool = true,
         pinningBypassDetectionEnabled: Bool = true,
@@ -57,6 +59,7 @@ public struct DeviceSecurityConfiguration: Equatable {
         self.reverseEngineeringCheckEnabled = reverseEngineeringCheckEnabled
         self.appIntegrityCheckEnabled = appIntegrityCheckEnabled
         self.expectedTeamID = expectedTeamID
+        self.expectedFileHashes = expectedFileHashes
         self.screenRecordingCheckEnabled = screenRecordingCheckEnabled
         self.hookDetectionEnabled = hookDetectionEnabled
         self.pinningBypassDetectionEnabled = pinningBypassDetectionEnabled

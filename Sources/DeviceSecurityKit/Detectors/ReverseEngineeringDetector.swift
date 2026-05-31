@@ -14,46 +14,12 @@ public final class ReverseEngineeringDetector {
     // MARK: - Private Properties
     private static let reverseEngineeringListsOptions = ReverseEngineeringListsOptions()
     private static let logger = SecurityLogger.security(subsystem: "ReverseEngineeringDetector")
-    private static let stateQueue = DispatchQueue(label: "com.devicesecuritykit.reverseeng.state", attributes: .concurrent)
-
-    // MARK: - Detection Toggles
-
-    private static var _isDetectionEnabled: Bool = true
-    private static var _isLibraryCheckEnabled: Bool = true
-    private static var _isEnvironmentCheckEnabled: Bool = true
-    private static var _isCodeIntegrityCheckEnabled: Bool = true
-
-    internal static var isDetectionEnabled: Bool {
-        get { stateQueue.sync { _isDetectionEnabled } }
-        set { stateQueue.sync(flags: .barrier) { _isDetectionEnabled = newValue } }
-    }
-
-    internal static var isLibraryCheckEnabled: Bool {
-        get { stateQueue.sync { _isLibraryCheckEnabled } }
-        set { stateQueue.sync(flags: .barrier) { _isLibraryCheckEnabled = newValue } }
-    }
-
-    internal static var isEnvironmentCheckEnabled: Bool {
-        get { stateQueue.sync { _isEnvironmentCheckEnabled } }
-        set { stateQueue.sync(flags: .barrier) { _isEnvironmentCheckEnabled = newValue } }
-    }
-
-    internal static var isCodeIntegrityCheckEnabled: Bool {
-        get { stateQueue.sync { _isCodeIntegrityCheckEnabled } }
-        set { stateQueue.sync(flags: .barrier) { _isCodeIntegrityCheckEnabled = newValue } }
-    }
 
     // MARK: - Public
     public static func isReverseEngineered() -> Bool {
-        guard isDetectionEnabled else { return false }
-
-        let (library, environment, codeIntegrity) = stateQueue.sync {
-            (_isLibraryCheckEnabled, _isEnvironmentCheckEnabled, _isCodeIntegrityCheckEnabled)
-        }
-
-        return (library       && checkSuspiciousLibraries())
-            || (environment   && checkEnvironmentVariables())
-            || (codeIntegrity && checkCodeIntegrity())
+        return checkSuspiciousLibraries()
+            || checkEnvironmentVariables()
+            || checkCodeIntegrity()
     }
     
     // MARK: - Private

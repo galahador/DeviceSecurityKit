@@ -15,68 +15,9 @@ public final class JailbreakDetector {
     
     // MARK: - Private Properties
     private static let jailbreakListOptions = JailbreakListOptions()
-    private static let detectionQueue = DispatchQueue(label: "JailbreakDetector.detection", attributes: .concurrent)
-    
-    // MARK: - Master Switch
-    
-    private static var _isDetectionEnabled: Bool = true
-    
-    internal static var isDetectionEnabled: Bool {
-        get { detectionQueue.sync { _isDetectionEnabled } }
-        set { detectionQueue.sync(flags: .barrier) { _isDetectionEnabled = newValue } }
-    }
-    
-    // MARK: - Per-Check Switches
-    
-    private static var _isFileCheckEnabled: Bool = true
-    private static var _isSandboxCheckEnabled: Bool = true
-    private static var _isForkCheckEnabled: Bool = true
-    private static var _isURLSchemeCheckEnabled: Bool = true
-    private static var _isSymbolicLinkCheckEnabled: Bool = true
-    private static var _isEnvironmentVarCheckEnabled: Bool = true
-    private static var _isPrebootCheckEnabled: Bool = true
-    
-    internal static var isFileCheckEnabled: Bool {
-        get { detectionQueue.sync { _isFileCheckEnabled } }
-        set { detectionQueue.sync(flags: .barrier) { _isFileCheckEnabled = newValue } }
-    }
-    
-    internal static var isSandboxCheckEnabled: Bool {
-        get { detectionQueue.sync { _isSandboxCheckEnabled } }
-        set { detectionQueue.sync(flags: .barrier) { _isSandboxCheckEnabled = newValue } }
-    }
-    
-    internal static var isForkCheckEnabled: Bool {
-        get { detectionQueue.sync { _isForkCheckEnabled } }
-        set { detectionQueue.sync(flags: .barrier) { _isForkCheckEnabled = newValue } }
-    }
-    
-    internal static var isURLSchemeCheckEnabled: Bool {
-        get { detectionQueue.sync { _isURLSchemeCheckEnabled } }
-        set { detectionQueue.sync(flags: .barrier) { _isURLSchemeCheckEnabled = newValue } }
-    }
-    
-    internal static var isSymbolicLinkCheckEnabled: Bool {
-        get { detectionQueue.sync { _isSymbolicLinkCheckEnabled } }
-        set { detectionQueue.sync(flags: .barrier) { _isSymbolicLinkCheckEnabled = newValue } }
-    }
-    
-    internal static var isEnvironmentVarCheckEnabled: Bool {
-        get { detectionQueue.sync { _isEnvironmentVarCheckEnabled } }
-        set { detectionQueue.sync(flags: .barrier) { _isEnvironmentVarCheckEnabled = newValue } }
-    }
-    
-    internal static var isPrebootCheckEnabled: Bool {
-        get { detectionQueue.sync { _isPrebootCheckEnabled } }
-        set { detectionQueue.sync(flags: .barrier) { _isPrebootCheckEnabled = newValue } }
-    }
     
     // MARK: - URL Scheme Checker
-    private static var _urlSchemeChecker: ((URL) -> Bool)? = defaultURLSchemeChecker()
-    internal static var urlSchemeChecker: ((URL) -> Bool)? {
-        get { detectionQueue.sync { _urlSchemeChecker } }
-        set { detectionQueue.sync(flags: .barrier) { _urlSchemeChecker = newValue } }
-    }
+    private static let _urlSchemeChecker: ((URL) -> Bool)? = defaultURLSchemeChecker()
 
     private static func defaultURLSchemeChecker() -> ((URL) -> Bool)? {
 #if canImport(UIKit) && !targetEnvironment(simulator)
@@ -99,40 +40,24 @@ public final class JailbreakDetector {
     // MARK: - Public
     
     public static func isJailbroken() -> Bool {
-        guard isDetectionEnabled else { return false }
-        
-        let (file, sandbox, fork, url, symlink, env, preboot) = detectionQueue.sync {
-            (_isFileCheckEnabled, _isSandboxCheckEnabled, _isForkCheckEnabled,
-             _isURLSchemeCheckEnabled, _isSymbolicLinkCheckEnabled,
-             _isEnvironmentVarCheckEnabled, _isPrebootCheckEnabled)
-        }
-        
-        return (file     && checkJailbreakFiles())
-        || (sandbox  && checkSandboxIntegrity())
-        || (fork     && checkForkCapability())
-        || (url      && checkSuspiciousURLSchemes())
-        || (symlink  && checkSymbolicLinks())
-        || (env      && checkSuspiciousEnvironmentVars())
-        || (preboot  && checkPrebootJailbreakPaths())
+        return checkJailbreakFiles()
+            || checkSandboxIntegrity()
+            || checkForkCapability()
+            || checkSuspiciousURLSchemes()
+            || checkSymbolicLinks()
+            || checkSuspiciousEnvironmentVars()
+            || checkPrebootJailbreakPaths()
     }
     
     public static func getDetectionDetails() -> [String] {
-        guard isDetectionEnabled else { return [] }
-
-        let (file, sandbox, fork, url, symlink, env, preboot) = detectionQueue.sync {
-            (_isFileCheckEnabled, _isSandboxCheckEnabled, _isForkCheckEnabled,
-             _isURLSchemeCheckEnabled, _isSymbolicLinkCheckEnabled,
-             _isEnvironmentVarCheckEnabled, _isPrebootCheckEnabled)
-        }
-
         var evidence: [String] = []
-        if file     { evidence.append(contentsOf: collectFileEvidence()) }
-        if sandbox  && checkSandboxIntegrity()        { evidence.append("sandboxEscapeWritable") }
-        if fork     && checkForkCapability()          { evidence.append("forkSucceeded") }
-        if url      { evidence.append(contentsOf: collectURLSchemeEvidence()) }
-        if symlink  { evidence.append(contentsOf: collectSymlinkEvidence()) }
-        if env      { evidence.append(contentsOf: collectEnvVarEvidence()) }
-        if preboot  { evidence.append(contentsOf: collectPrebootEvidence()) }
+        evidence.append(contentsOf: collectFileEvidence())
+        if checkSandboxIntegrity()  { evidence.append("sandboxEscapeWritable") }
+        if checkForkCapability()    { evidence.append("forkSucceeded") }
+        evidence.append(contentsOf: collectURLSchemeEvidence())
+        evidence.append(contentsOf: collectSymlinkEvidence())
+        evidence.append(contentsOf: collectEnvVarEvidence())
+        evidence.append(contentsOf: collectPrebootEvidence())
         return evidence
     }
 
@@ -149,7 +74,7 @@ public final class JailbreakDetector {
     }
 
     private static func collectURLSchemeEvidence() -> [String] {
-        guard let checker = detectionQueue.sync(execute: { _urlSchemeChecker }) else { return [] }
+        guard let checker = _urlSchemeChecker else { return [] }
         var found: [String] = []
         for scheme in jailbreakListOptions.urlSchemes {
             if let url = URL(string: scheme), checker(url) {
@@ -227,7 +152,7 @@ public final class JailbreakDetector {
     }
     
     private static func checkSuspiciousURLSchemes() -> Bool {
-        guard let checker = detectionQueue.sync(execute: { _urlSchemeChecker }) else { return false }
+        guard let checker = _urlSchemeChecker else { return false }
         
         for scheme in jailbreakListOptions.urlSchemes {
             if let url = URL(string: scheme), checker(url) {
