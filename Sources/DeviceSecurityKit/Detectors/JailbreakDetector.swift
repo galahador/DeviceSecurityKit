@@ -104,15 +104,75 @@ public final class JailbreakDetector {
              _isEnvironmentVarCheckEnabled, _isPrebootCheckEnabled)
         }
 
-        var methods: [String] = []
-        if file     && checkJailbreakFiles()          { methods.append("jailbreakFiles") }
-        if sandbox  && checkSandboxIntegrity()        { methods.append("sandboxIntegrity") }
-        if fork     && checkForkCapability()          { methods.append("forkCapability") }
-        if url      && checkSuspiciousURLSchemes()    { methods.append("suspiciousURLSchemes") }
-        if symlink  && checkSymbolicLinks()           { methods.append("symbolicLinks") }
-        if env      && checkSuspiciousEnvironmentVars() { methods.append("environmentVars") }
-        if preboot  && checkPrebootJailbreakPaths()   { methods.append("prebootPaths") }
-        return methods
+        var evidence: [String] = []
+        if file     { evidence.append(contentsOf: collectFileEvidence()) }
+        if sandbox  && checkSandboxIntegrity()        { evidence.append("sandboxEscapeWritable") }
+        if fork     && checkForkCapability()          { evidence.append("forkSucceeded") }
+        if url      { evidence.append(contentsOf: collectURLSchemeEvidence()) }
+        if symlink  { evidence.append(contentsOf: collectSymlinkEvidence()) }
+        if env      { evidence.append(contentsOf: collectEnvVarEvidence()) }
+        if preboot  { evidence.append(contentsOf: collectPrebootEvidence()) }
+        return evidence
+    }
+
+    // MARK: - Evidence Collectors
+
+    private static func collectFileEvidence() -> [String] {
+        var found: [String] = []
+        for path in jailbreakListOptions.suspiciousPaths {
+            if FileManager.default.fileExists(atPath: path) || FileManager.default.isReadableFile(atPath: path) {
+                found.append("suspiciousPath(\"\(path)\")")
+            }
+        }
+        return found
+    }
+
+    private static func collectURLSchemeEvidence() -> [String] {
+        guard let checker = detectionQueue.sync(execute: { _urlSchemeChecker }) else { return [] }
+        var found: [String] = []
+        for scheme in jailbreakListOptions.urlSchemes {
+            if let url = URL(string: scheme), checker(url) {
+                found.append("urlSchemeResponds(\"\(scheme)\")")
+            }
+        }
+        return found
+    }
+
+    private static func collectSymlinkEvidence() -> [String] {
+        var found: [String] = []
+        for path in jailbreakListOptions.suspiciousPaths {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+               let fileType = attrs[.type] as? FileAttributeType,
+               fileType == .typeSymbolicLink {
+                found.append("symbolicLink(\"\(path)\")")
+            }
+        }
+        return found
+    }
+
+    private static func collectEnvVarEvidence() -> [String] {
+#if DEBUG
+        return []
+#else
+        var found: [String] = []
+        for envVar in jailbreakListOptions.suspiciousVars {
+            if getenv(envVar) != nil {
+                found.append("envVar(\"\(envVar)\")")
+            }
+        }
+        return found
+#endif
+    }
+
+    private static func collectPrebootEvidence() -> [String] {
+        var found: [String] = []
+        for path in jailbreakListOptions.suspiciousPaths {
+            guard path.contains("preboot") || path.contains("/var/jb") else { continue }
+            if FileManager.default.fileExists(atPath: path) {
+                found.append("prebootPath(\"\(path)\")")
+            }
+        }
+        return found
     }
 
     // MARK: - Private Detection Methods
