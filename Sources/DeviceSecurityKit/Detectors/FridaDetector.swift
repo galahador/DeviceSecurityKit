@@ -127,7 +127,7 @@ public final class FridaDetector {
 
         for port in ports {
             if isPortOpen(port, ipAddr: ipAddr) {
-                logger.warning("Frida server detected: port \(port) is open on localhost")
+                logger.warning("Frida server detected: open port on localhost")
                 return true
             }
         }

@@ -155,7 +155,7 @@ public final class EmulatorDetector {
 
         for path in criticalPaths {
             if FileManager.default.fileExists(atPath: path) {
-                logger.debug("Found critical emulator-specific path: \(path)")
+                logger.debug("Found critical emulator-specific path: \(SecurityLogger.redact(path))")
                 return true
             }
         }
@@ -168,7 +168,7 @@ public final class EmulatorDetector {
         for path in additionalPaths {
             if FileManager.default.fileExists(atPath: path) {
                 additionalMatches += 1
-                logger.debug("Found additional simulator path: \(path)")
+                logger.debug("Found additional simulator path: \(SecurityLogger.redact(path))")
             }
         }
 
@@ -185,13 +185,13 @@ public final class EmulatorDetector {
 
         for identifier in simulatorOnlyIdentifiers {
             if modelIdentifier.lowercased() == identifier.lowercased() {
-                logger.debug("Detected simulator-only architecture: \(modelIdentifier)")
+                logger.debug("Detected simulator-only architecture: \(SecurityLogger.redact(modelIdentifier))")
                 return true
             }
         }
 
         if modelIdentifier.lowercased().contains("simulator") {
-            logger.debug("Found 'Simulator' in model identifier: \(modelIdentifier)")
+            logger.debug("Found 'Simulator' in model identifier: \(SecurityLogger.redact(modelIdentifier))")
             return true
         }
 
@@ -225,7 +225,7 @@ public final class EmulatorDetector {
 
         for envVar in EmulatorDetector.emulatorDetectorListOptions.suspiciousEnvVars {
             if let value = getenv(envVar) {
-                logger.debug("Found simulator environment variable: \(envVar) = \(String(cString: value))")
+                logger.debug("Found simulator environment variable: \(SecurityLogger.redact(envVar))")
                 return true
             }
         }
@@ -266,20 +266,20 @@ public final class EmulatorDetector {
         let arguments = ProcessInfo.processInfo.arguments
 
         if processName.lowercased().contains("simulator") {
-            logger.debug("Process name contains 'simulator': \(processName)")
+            logger.debug("Process name contains 'simulator': \(SecurityLogger.redact(processName))")
             return true
         }
 
         for argument in arguments {
             if argument.contains("Simulator") || argument.contains("/CoreSimulator/") {
-                logger.debug("Found simulator-specific argument: \(argument)")
+                logger.debug("Found simulator-specific argument: \(SecurityLogger.redact(argument))")
                 return true
             }
         }
 
         let bundlePath = Bundle.main.bundlePath
         if bundlePath.contains("CoreSimulator") || bundlePath.contains("Simulator") {
-            logger.debug("Bundle path indicates simulator: \(bundlePath)")
+            logger.debug("Bundle path indicates simulator: \(SecurityLogger.redact(bundlePath))")
             return true
         }
 
@@ -301,7 +301,7 @@ public final class EmulatorDetector {
             || sysctlMachine.hasPrefix(ipodPrefix)
 
         if !isRealDevice {
-            logger.debug("hw.machine returned '\(sysctlMachine)' — not an iOS device identifier")
+            logger.debug("hw.machine returned non-iOS device identifier: \(SecurityLogger.redact(sysctlMachine))")
             return true
         }
 
