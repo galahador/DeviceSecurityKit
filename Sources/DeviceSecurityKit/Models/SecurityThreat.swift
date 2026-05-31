@@ -16,7 +16,8 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
     case screenRecording
     case hooked
     case pinningBypassed
-    case vpnProxy
+    case vpnDetected
+    case proxyDetected
     case methodSwizzling
     case fridaDetected
     case attestationFailed
@@ -44,8 +45,10 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
             return "Security functions have been hooked"
         case .pinningBypassed:
             return "Certificate pinning bypass detected"
-        case .vpnProxy:
-            return "VPN or proxy connection detected"
+        case .vpnDetected:
+            return "VPN connection detected"
+        case .proxyDetected:
+            return "Proxy configuration detected"
         case .methodSwizzling:
             return "Objective-C method swizzling detected"
         case .fridaDetected:
@@ -83,7 +86,9 @@ public enum SecurityThreat: String, CaseIterable, Equatable {
             return .high
         case .emulator:
             return .medium
-        case .vpnProxy:
+        case .vpnDetected:
+            return .medium
+        case .proxyDetected:
             return .medium
         case .methodSwizzling:
             return .critical
