@@ -46,4 +46,68 @@ final class SecurityThreatTests: XCTestCase {
         let set: Set<SecurityThreat> = [.jailbreak, .jailbreak, .debugger, .screenRecording]
         XCTAssertEqual(set.count, 3)
     }
+
+    // MARK: - Risk Score
+
+    func testRiskScore_noThreats() {
+        let result = SecurityResult(threats: [])
+        XCTAssertEqual(result.riskScore, 0.0)
+        XCTAssertEqual(result.riskLevel, .none)
+    }
+
+    func testRiskScore_noThreatOnly() {
+        let result = SecurityResult(threats: [.noThreat])
+        XCTAssertEqual(result.riskScore, 0.0)
+        XCTAssertEqual(result.riskLevel, .none)
+    }
+
+    func testRiskScore_singleMedium() {
+        let result = SecurityResult(threats: [.emulator])
+        XCTAssertGreaterThan(result.riskScore, 0.2)
+        XCTAssertLessThan(result.riskScore, 0.5)
+        XCTAssertEqual(result.riskLevel, .medium)
+    }
+
+    func testRiskScore_singleCritical() {
+        let result = SecurityResult(threats: [.jailbreak])
+        XCTAssertGreaterThan(result.riskScore, 0.7)
+        XCTAssertLessThanOrEqual(result.riskScore, 1.0)
+        XCTAssertEqual(result.riskLevel, .critical)
+    }
+
+    func testRiskScore_multipleCritical() {
+        let result = SecurityResult(threats: [.jailbreak, .fridaDetected, .hooked])
+        XCTAssertGreaterThan(result.riskScore, 0.8)
+        XCTAssertEqual(result.riskLevel, .critical)
+    }
+
+    func testRiskScore_escalatesWithMoreThreats() {
+        let single = SecurityResult(threats: [.jailbreak])
+        let double = SecurityResult(threats: [.jailbreak, .fridaDetected])
+        let triple = SecurityResult(threats: [.jailbreak, .fridaDetected, .hooked])
+        XCTAssertLessThan(single.riskScore, double.riskScore)
+        XCTAssertLessThan(double.riskScore, triple.riskScore)
+    }
+
+    func testRiskScore_cappedAtOne() {
+        let result = SecurityResult(threats: [
+            .jailbreak, .fridaDetected, .hooked, .reverseEngineering,
+            .appIntegrity, .methodSwizzling, .dylibInjection, .repackaged
+        ])
+        XCTAssertLessThanOrEqual(result.riskScore, 1.0)
+        XCTAssertEqual(result.riskLevel, .critical)
+    }
+
+    func testRiskLevel_comparable() {
+        XCTAssertLessThan(RiskLevel.none, .low)
+        XCTAssertLessThan(RiskLevel.low, .medium)
+        XCTAssertLessThan(RiskLevel.medium, .high)
+        XCTAssertLessThan(RiskLevel.high, .critical)
+    }
+
+    func testRiskLevel_descriptions() {
+        for level in [RiskLevel.none, .low, .medium, .high, .critical] {
+            XCTAssertFalse(level.description.isEmpty)
+        }
+    }
 }

@@ -97,5 +97,71 @@ public struct SecurityResult: Equatable {
         return threats.contains(.dylibInjection)
     }
 
+    // MARK: - Risk Score
+    ///
+    /// | Scenario                     | Approximate score |
+    /// |------------------------------|-------------------|
+    /// | No threats                   | 0.0               |
+    /// | One medium threat            | ~0.35             |
+    /// | One critical threat          | ~0.70             |
+    /// | Two critical threats         | ~0.82             |
+    /// | Three+ critical threats      | 0.90 – 1.0       |
+    public var riskScore: Double {
+        let active = threats.filter { $0 != .noThreat }
+        guard !active.isEmpty else { return 0.0 }
+
+        let maxSeverity = active.map { $0.severity.rawValue }.max() ?? 0
+        let totalWeight = active.reduce(0) { $0 + $1.severity.rawValue }
+
+        // Floor: highest severity mapped to 0–0.7 range
+        let floor = Double(maxSeverity) / Double(ThreatSeverity.critical.rawValue) * 0.7
+
+        // Compound bonus: sum of all severity weights, diminishing via log curve
+        // log2(1 + totalWeight) grows slowly — 4→2.3, 8→3.2, 12→3.7, 20→4.4
+        let compoundBonus = min(log2(1.0 + Double(totalWeight)) / 15.0, 0.3)
+
+        return min(floor + compoundBonus, 1.0)
+    }
+
+    /// Human-readable risk level derived from `riskScore`.
+    public var riskLevel: RiskLevel {
+        switch riskScore {
+        case 0.0:
+            return .none
+        case ..<0.25:
+            return .low
+        case ..<0.50:
+            return .medium
+        case ..<0.75:
+            return .high
+        default:
+            return .critical
+        }
+    }
+
     public static let secure = SecurityResult(threats: [])
+}
+
+// MARK: - Risk Level
+
+public enum RiskLevel: Int, Comparable, CustomStringConvertible {
+    case none = 0
+    case low = 1
+    case medium = 2
+    case high = 3
+    case critical = 4
+
+    public static func < (lhs: RiskLevel, rhs: RiskLevel) -> Bool {
+        return lhs.rawValue < rhs.rawValue
+    }
+
+    public var description: String {
+        switch self {
+        case .none:     return "None"
+        case .low:      return "Low"
+        case .medium:   return "Medium"
+        case .high:     return "High"
+        case .critical: return "Critical"
+        }
+    }
 }

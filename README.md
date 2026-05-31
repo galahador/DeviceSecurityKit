@@ -392,6 +392,17 @@ DSK.shared.removeAllCountermeasures()
 
 ---
 
+## Limitations
+
+DeviceSecurityKit is a **client-side detection library**. All checks run within the app process on the user's device, which means:
+
+- **Bypassable by a determined attacker.** Anyone with full control of the device (root access, custom kernel, instrumentation frameworks) can intercept, patch, or suppress any check. No client-side security library can prevent this.
+- **Best used as a signal, not a gate.** Treat detection results as one input into a broader risk-assessment pipeline. Combine them with server-side validation (App Attest, device posture APIs, backend anomaly detection) for defence in depth.
+- **False positives are possible.** Some legitimate developer tools, accessibility software, enterprise MDM profiles, or VPN configurations may trigger detections. Test thoroughly with your user base and use the configuration API to disable checks that don't apply.
+- **Simulator environment.** Several detectors are automatically disabled in the iOS Simulator (`#if targetEnvironment(simulator)`) because they would always trigger. Test security-critical flows on a real device.
+
+---
+
 ## 🤝 Contributing
 
 Issues and pull requests are welcome.
