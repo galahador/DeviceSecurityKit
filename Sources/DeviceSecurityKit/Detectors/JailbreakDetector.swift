@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 import Darwin
 
 public final class JailbreakDetector {
@@ -69,10 +72,28 @@ public final class JailbreakDetector {
     }
     
     // MARK: - URL Scheme Checker
-    private static var _urlSchemeChecker: ((URL) -> Bool)?
+    private static var _urlSchemeChecker: ((URL) -> Bool)? = defaultURLSchemeChecker()
     internal static var urlSchemeChecker: ((URL) -> Bool)? {
         get { detectionQueue.sync { _urlSchemeChecker } }
         set { detectionQueue.sync(flags: .barrier) { _urlSchemeChecker = newValue } }
+    }
+
+    private static func defaultURLSchemeChecker() -> ((URL) -> Bool)? {
+#if canImport(UIKit) && !targetEnvironment(simulator)
+        return { url in
+            // canOpenURL must be called on the main thread
+            if Thread.isMainThread {
+                return UIApplication.shared.canOpenURL(url)
+            }
+            var result = false
+            DispatchQueue.main.sync {
+                result = UIApplication.shared.canOpenURL(url)
+            }
+            return result
+        }
+#else
+        return nil
+#endif
     }
     
     // MARK: - Public
