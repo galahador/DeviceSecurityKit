@@ -21,6 +21,8 @@ public struct DeviceSecurityConfiguration: Equatable {
     public var allowedVPNBundleIDs: [String]
     public var swizzlingDetectionEnabled: Bool
     public var fridaDetectionEnabled: Bool
+    public var fridaPortScanEnabled: Bool
+    public var fridaPorts: [UInt16]
     public var attestationCheckEnabled: Bool
     public var antiRepackagingEnabled: Bool
     public var expectedCertificateHash: String?
@@ -41,6 +43,8 @@ public struct DeviceSecurityConfiguration: Equatable {
         allowedVPNBundleIDs: [String] = [],
         swizzlingDetectionEnabled: Bool = true,
         fridaDetectionEnabled: Bool = true,
+        fridaPortScanEnabled: Bool = true,
+        fridaPorts: [UInt16] = FridaDetector.defaultPorts,
         attestationCheckEnabled: Bool = false,
         antiRepackagingEnabled: Bool = false,
         expectedCertificateHash: String? = nil,
@@ -60,6 +64,8 @@ public struct DeviceSecurityConfiguration: Equatable {
         self.allowedVPNBundleIDs = allowedVPNBundleIDs
         self.swizzlingDetectionEnabled = swizzlingDetectionEnabled
         self.fridaDetectionEnabled = fridaDetectionEnabled
+        self.fridaPortScanEnabled = fridaPortScanEnabled
+        self.fridaPorts = fridaPorts
         self.attestationCheckEnabled = attestationCheckEnabled
         self.antiRepackagingEnabled = antiRepackagingEnabled
         self.expectedCertificateHash = expectedCertificateHash
@@ -159,9 +165,19 @@ public struct DeviceSecurityConfiguration: Equatable {
         return config
     }
 
-    public func withFridaDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
+    public func withFridaDetection(
+        _ enabled: Bool,
+        portScanEnabled: Bool? = nil,
+        customPorts: [UInt16]? = nil
+    ) -> DeviceSecurityConfiguration {
         var config = self
         config.fridaDetectionEnabled = enabled
+        if let portScan = portScanEnabled {
+            config.fridaPortScanEnabled = portScan
+        }
+        if let ports = customPorts {
+            config.fridaPorts = ports
+        }
         return config
     }
 
