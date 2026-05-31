@@ -24,6 +24,42 @@ public final class FridaDetector {
             || checkFridaPort()
     }
 
+    public static func collectEvidence() -> [String] {
+        var evidence: [String] = []
+
+        let fridaMarker = o.reveal([0xB5, 0x86, 0x62, 0x8B, 0xC1, 0x43, 0x5E, 0x71, 0x94])
+        let count = _dyld_image_count()
+        for i in 0..<count {
+            guard let rawName = _dyld_get_image_name(i) else { continue }
+            let path = String(cString: rawName)
+            if path.lowercased().contains(fridaMarker) {
+                evidence.append("loadedLibrary(\"\(path)\")")
+            }
+        }
+
+        let symbols = [
+            o.reveal([0x16, 0xD4, 0x14, 0x33, 0x0B, 0xAC, 0xBC, 0x5A, 0x22, 0xBB, 0x4F, 0xBB, 0x98, 0x6C, 0x51, 0xFF, 0x13, 0x0F, 0x28, 0xAA]),
+            o.reveal([0xE9, 0xFB, 0xAB, 0xCB, 0x3B, 0x09, 0xBB, 0xDF, 0x13, 0x90, 0x6C, 0xAE, 0x89, 0xC0, 0x8F, 0x9E, 0x73, 0x21, 0x3A, 0x07, 0x42])
+        ]
+        let rtldDefault = UnsafeMutableRawPointer(bitPattern: -2)
+        for symbol in symbols {
+            if dlsym(rtldDefault, symbol) != nil {
+                evidence.append("fridaSymbol(\"\(symbol)\")")
+            }
+        }
+
+        let ipAddr = inet_addr(o.reveal([0xA4, 0x4D, 0x21, 0x93, 0xB7, 0xBD, 0xCF, 0xF5, 0xB4, 0x6B, 0x1F, 0x17, 0x77]))
+        if ipAddr != in_addr_t(0xFFFF_FFFF) {
+            for port in fridaPorts {
+                if isPortOpen(port, ipAddr: ipAddr) {
+                    evidence.append("openPort(\(port))")
+                }
+            }
+        }
+
+        return evidence
+    }
+
     // MARK: - Private
     private static func checkLoadedLibraries() -> Bool {
         let fridaMarker = o.reveal([0xB5, 0x86, 0x62, 0x8B, 0xC1, 0x43, 0x5E, 0x71, 0x94])  // "frida"

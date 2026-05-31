@@ -206,44 +206,57 @@ public final class SecurityMonitor: SecurityMonitorType {
         #endif
         if cfg.reverseEngineeringCheckEnabled && ReverseEngineeringDetector.isReverseEngineered() {
             threats.append(.reverseEngineering)
+            evidence[.reverseEngineering] = ["reverseEngineeringToolDetected"]
         }
         if cfg.appIntegrityCheckEnabled && AppIntegrityDetector.isIntegrityCompromised(expectedTeamID: cfg.expectedTeamID) {
             threats.append(.appIntegrity)
+            evidence[.appIntegrity] = ["integrityCheckFailed"]
         }
         if cfg.screenRecordingCheckEnabled,
            let provider,
            provider.isScreenBeingRecorded() {
             threats.append(.screenRecording)
+            evidence[.screenRecording] = ["screenBeingRecorded"]
         }
         if cfg.hookDetectionEnabled && HookDetector.isFunctionHooked() {
             threats.append(.hooked)
+            evidence[.hooked] = HookDetector.collectEvidence()
         }
         if cfg.pinningBypassDetectionEnabled && CertificatePinningDetector.isPinningBypassed() {
             threats.append(.pinningBypassed)
+            evidence[.pinningBypassed] = ["pinningBypassDetected"]
         }
         if cfg.vpnProxyDetectionEnabled && VPNProxyDetector.isVPNOrProxyActive(allowedVPNBundleIDs: cfg.allowedVPNBundleIDs) {
             threats.append(.vpnProxy)
+            evidence[.vpnProxy] = ["vpnOrProxyActive"]
         }
         if cfg.swizzlingDetectionEnabled && SwizzlingDetector.isSwizzled() {
             threats.append(.methodSwizzling)
+            evidence[.methodSwizzling] = ["methodSwizzlingDetected"]
         }
         if cfg.fridaDetectionEnabled && FridaDetector.isFridaDetected() {
             threats.append(.fridaDetected)
+            evidence[.fridaDetected] = FridaDetector.collectEvidence()
         }
         if cfg.attestationCheckEnabled && AttestationDetector.isAttestationFailed() {
             threats.append(.attestationFailed)
+            evidence[.attestationFailed] = ["attestationFailed"]
         }
         if DSKIntegrityChecker.isDSKCompromised() {
             threats.append(.dskTampered)
+            evidence[.dskTampered] = ["dskIntegrityCheckFailed"]
         }
         if cfg.antiRepackagingEnabled && RepackagingDetector.isRepackaged(expectedCertificateHash: cfg.expectedCertificateHash) {
             threats.append(.repackaged)
+            evidence[.repackaged] = ["signingCertificateMismatch"]
         }
         if cfg.screenshotDetectionEnabled && ScreenshotDetector.wasScreenshotTaken() {
             threats.append(.screenshotTaken)
+            evidence[.screenshotTaken] = ["screenshotDetectedInWindow"]
         }
         if cfg.dylibInjectionDetectionEnabled && DylibInjectionDetector.isDylibInjected() {
             threats.append(.dylibInjection)
+            evidence[.dylibInjection] = DylibInjectionDetector.collectEvidence()
         }
 
         return SecurityResult(threats: threats, evidence: evidence)

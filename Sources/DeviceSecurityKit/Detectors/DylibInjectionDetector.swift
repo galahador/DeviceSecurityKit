@@ -23,6 +23,81 @@ public final class DylibInjectionDetector {
 #endif
     }
 
+    public static func collectEvidence() -> [String] {
+#if targetEnvironment(simulator)
+        return []
+#else
+        var evidence: [String] = []
+
+        // DYLD_INSERT_LIBRARIES
+#if !DEBUG
+        let o = StringObfuscator.shared
+        let envVar = o.reveal([
+            0xAA, 0xBB, 0xCC, 0xDD, 0xEA, 0x83, 0x22, 0xC2,
+            0xEF, 0x15, 0x51, 0x4F, 0x4B, 0x04, 0x23, 0x12,
+            0x5D, 0x9B, 0x55, 0x6F, 0x9B, 0xAB, 0x9F, 0xAB, 0xBA
+        ])
+        if let val = getenv(envVar) {
+            let value = String(cString: val)
+            if !value.isEmpty {
+                evidence.append("envVar(\"\(envVar)=\(value)\")")
+            }
+        }
+#endif
+
+        // Loaded images
+        let appBundlePath = Bundle.main.bundlePath
+        let imageCount = _dyld_image_count()
+        for i in 0..<imageCount {
+            guard let name = _dyld_get_image_name(i) else { continue }
+            let path = String(cString: name)
+            if !isExpectedImagePath(path, appBundlePath: appBundlePath) {
+                evidence.append("injectedImage(\"\(path)\")")
+            }
+        }
+
+        // LC_LOAD_DYLIB commands
+        if let header = _dyld_get_image_header(0) {
+            let rawPtr = UnsafeRawPointer(header)
+            let magic = rawPtr.load(as: UInt32.self)
+            let headerSize: Int
+            let ncmds: UInt32
+            if magic == MH_MAGIC_64 {
+                let hdr = rawPtr.assumingMemoryBound(to: mach_header_64.self)
+                headerSize = MemoryLayout<mach_header_64>.size
+                ncmds = hdr.pointee.ncmds
+            } else if magic == MH_MAGIC {
+                let hdr = rawPtr.assumingMemoryBound(to: mach_header.self)
+                headerSize = MemoryLayout<mach_header>.size
+                ncmds = hdr.pointee.ncmds
+            } else {
+                return evidence
+            }
+
+            var cmdPtr = rawPtr.advanced(by: headerSize)
+            for _ in 0..<ncmds {
+                let cmd = cmdPtr.load(as: UInt32.self)
+                let cmdsize = cmdPtr.load(fromByteOffset: 4, as: UInt32.self)
+                guard cmdsize >= 8 else { break }
+
+                if cmd == LC_LOAD_DYLIB || cmd == LC_LOAD_WEAK_DYLIB || cmd == LC_REEXPORT_DYLIB || cmd == UInt32(0x20) {
+                    let nameOffset = Int(cmdPtr.load(fromByteOffset: 8, as: UInt32.self))
+                    if nameOffset < Int(cmdsize) {
+                        let namePtr = cmdPtr.advanced(by: nameOffset).assumingMemoryBound(to: CChar.self)
+                        let dylibPath = String(cString: namePtr)
+                        if !isExpectedDylibPath(dylibPath) {
+                            evidence.append("unexpectedLoadCommand(\"\(dylibPath)\")")
+                        }
+                    }
+                }
+                cmdPtr = cmdPtr.advanced(by: Int(cmdsize))
+            }
+        }
+
+        return evidence
+#endif
+    }
+
     // MARK: - Check 1: DYLD_INSERT_LIBRARIES environment variable
 
     private static func checkDYLDEnvironment() -> Bool {
