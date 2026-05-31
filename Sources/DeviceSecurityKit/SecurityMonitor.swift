@@ -234,9 +234,9 @@ public final class SecurityMonitor: SecurityMonitorType {
             threats.append(.methodSwizzling)
             evidence[.methodSwizzling] = ["methodSwizzlingDetected"]
         }
-        if cfg.fridaDetectionEnabled && FridaDetector.isFridaDetected() {
+        if cfg.fridaDetectionEnabled && FridaDetector.isFridaDetected(portScanEnabled: cfg.fridaPortScanEnabled, ports: cfg.fridaPorts) {
             threats.append(.fridaDetected)
-            evidence[.fridaDetected] = FridaDetector.collectEvidence()
+            evidence[.fridaDetected] = FridaDetector.collectEvidence(portScanEnabled: cfg.fridaPortScanEnabled, ports: cfg.fridaPorts)
         }
         if cfg.attestationCheckEnabled && AttestationDetector.isAttestationFailed() {
             threats.append(.attestationFailed)

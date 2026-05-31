@@ -17,14 +17,16 @@ public final class FridaDetector {
     private static var _portCheckCache: (date: Date, result: Bool, processCount: Int)?
     private static let portCheckCacheInterval: TimeInterval = 5
 
+    public static let defaultPorts: [UInt16] = [27042, 27043, 27044, 27045, 1337]
+
     // MARK: - Public
-    public static func isFridaDetected() -> Bool {
+    public static func isFridaDetected(portScanEnabled: Bool = true, ports: [UInt16]? = nil) -> Bool {
         return checkLoadedLibraries()
             || checkFridaSymbols()
-            || checkFridaPort()
+            || (portScanEnabled && checkFridaPort(ports: ports ?? defaultPorts))
     }
 
-    public static func collectEvidence() -> [String] {
+    public static func collectEvidence(portScanEnabled: Bool = true, ports: [UInt16]? = nil) -> [String] {
         var evidence: [String] = []
 
         let fridaMarker = o.reveal([0xB5, 0x86, 0x62, 0x8B, 0xC1, 0x43, 0x5E, 0x71, 0x94])
@@ -48,11 +50,14 @@ public final class FridaDetector {
             }
         }
 
-        let ipAddr = inet_addr(o.reveal([0xA4, 0x4D, 0x21, 0x93, 0xB7, 0xBD, 0xCF, 0xF5, 0xB4, 0x6B, 0x1F, 0x17, 0x77]))
-        if ipAddr != in_addr_t(0xFFFF_FFFF) {
-            for port in fridaPorts {
-                if isPortOpen(port, ipAddr: ipAddr) {
-                    evidence.append("openPort(\(port))")
+        if portScanEnabled {
+            let portsToScan = ports ?? defaultPorts
+            let ipAddr = inet_addr(o.reveal([0xA4, 0x4D, 0x21, 0x93, 0xB7, 0xBD, 0xCF, 0xF5, 0xB4, 0x6B, 0x1F, 0x17, 0x77]))
+            if ipAddr != in_addr_t(0xFFFF_FFFF) {
+                for port in portsToScan {
+                    if isPortOpen(port, ipAddr: ipAddr) {
+                        evidence.append("openPort(\(port))")
+                    }
                 }
             }
         }
@@ -92,7 +97,7 @@ public final class FridaDetector {
         return false
     }
 
-    private static func checkFridaPort() -> Bool {
+    private static func checkFridaPort(ports: [UInt16]) -> Bool {
         let now = Date()
         let currentProcessCount = getProcessCount()
 
@@ -102,7 +107,7 @@ public final class FridaDetector {
             return cached.result
         }
 
-        let result = performPortCheck()
+        let result = performPortCheck(ports: ports)
         cacheQueue.sync(flags: .barrier) {
             _portCheckCache = (now, result, currentProcessCount)
         }
@@ -116,14 +121,11 @@ public final class FridaDetector {
         return size / MemoryLayout<kinfo_proc>.stride
     }
 
-    // Frida default + common alternate ports
-    private static let fridaPorts: [UInt16] = [27042, 27043, 27044, 27045, 1337]
-
-    private static func performPortCheck() -> Bool {
+    private static func performPortCheck(ports: [UInt16]) -> Bool {
         let ipAddr = inet_addr(o.reveal([0xA4, 0x4D, 0x21, 0x93, 0xB7, 0xBD, 0xCF, 0xF5, 0xB4, 0x6B, 0x1F, 0x17, 0x77]))
         guard ipAddr != in_addr_t(0xFFFF_FFFF) else { return false }
 
-        for port in fridaPorts {
+        for port in ports {
             if isPortOpen(port, ipAddr: ipAddr) {
                 logger.warning("Frida server detected: port \(port) is open on localhost")
                 return true
