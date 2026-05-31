@@ -177,13 +177,22 @@ public final class AppIntegrityDetector {
 
     private static func buildCriticalFileList() -> [String] {
         var files = ["Info.plist"]
-        // Add embedded frameworks' Info.plist entries
+
+    
+        if let execName = Bundle.main.executableURL?.lastPathComponent {
+            files.append(execName)
+        }
+
         let frameworksPath = Bundle.main.bundlePath + "/Frameworks"
         if let frameworks = try? FileManager.default.contentsOfDirectory(atPath: frameworksPath) {
             for fw in frameworks where fw.hasSuffix(".framework") {
                 files.append("Frameworks/\(fw)/Info.plist")
+                // Framework binary name matches the .framework directory name minus extension
+                let binaryName = (fw as NSString).deletingPathExtension
+                files.append("Frameworks/\(fw)/\(binaryName)")
             }
         }
+
         return files
     }
 
