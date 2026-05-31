@@ -25,6 +25,13 @@ public final class AttestationDetector {
 
     // MARK: - Public – synchronous check (reads cached state)
 
+    /// Returns `true` only when attestation has been attempted **and** failed.
+    /// Returns `false` when no attempt has been made yet — use `hasAttempted`
+    /// to distinguish "not yet checked" from "checked and passed".
+    /// **Important:** A local attestation success does not guarantee device
+    /// integrity. You must send the attestation object to your server and call
+    /// `markAttestationSucceeded()` or `markAttestationFailed()` based on the
+    /// server's response.
     public static func isAttestationFailed() -> Bool {
 #if os(iOS)
         guard DCAppAttestService.shared.isSupported else { return false }
@@ -32,6 +39,14 @@ public final class AttestationDetector {
 #else
         return false
 #endif
+    }
+
+    /// Whether `attest(challengeHash:completion:)` or one of the
+    /// `markAttestation…` methods has been called at least once.
+    /// When `false`, `isAttestationFailed()` will also be `false` —
+    /// meaning the device has **not** been validated, not that it passed.
+    public static var hasAttempted: Bool {
+        stateQueue.sync { _hasAttempted }
     }
 
     // MARK: - Public – async attestation
