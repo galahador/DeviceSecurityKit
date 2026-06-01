@@ -32,6 +32,9 @@ public protocol SecurityMonitorType {
     func onThreatDetected(_ handler: @escaping (SecurityThreat) -> Void) -> Self
 
     @discardableResult
+    func onThreatEvent(_ handler: @escaping (ThreatEvent) -> Void) -> Self
+
+    @discardableResult
     func addCountermeasure(_ countermeasure: Countermeasure) -> Self
 
     @discardableResult
