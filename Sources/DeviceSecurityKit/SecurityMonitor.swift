@@ -34,6 +34,10 @@ public final class SecurityMonitor: SecurityMonitorType {
     private var _screenRecordingProvider: ScreenRecordingProvider? = DefaultScreenRecordingProvider()
     private var _countermeasures: [Countermeasure] = []
 
+    // MARK: - Threat History (ring buffer, protected by stateQueue)
+    private var _threatHistory: [ThreatEvent] = []
+    private var _threatHistoryMaxSize: Int = 100
+
     // MARK: - Public Properties
     public var status: SecurityStatus {
         stateQueue.sync { _status }
@@ -49,6 +53,26 @@ public final class SecurityMonitor: SecurityMonitorType {
     public var screenRecordingProvider: ScreenRecordingProvider? {
         get { stateQueue.sync { _screenRecordingProvider } }
         set { stateQueue.sync(flags: .barrier) { _screenRecordingProvider = newValue } }
+    }
+
+    public var threatHistory: [ThreatEvent] {
+        stateQueue.sync { _threatHistory }
+    }
+
+    public var threatHistoryMaxSize: Int {
+        get { stateQueue.sync { _threatHistoryMaxSize } }
+        set {
+            stateQueue.sync(flags: .barrier) {
+                _threatHistoryMaxSize = max(newValue, 0)
+                if _threatHistory.count > _threatHistoryMaxSize {
+                    _threatHistory.removeFirst(_threatHistory.count - _threatHistoryMaxSize)
+                }
+            }
+        }
+    }
+
+    public func clearThreatHistory() {
+        stateQueue.sync(flags: .barrier) { _threatHistory.removeAll() }
     }
 
     // MARK: - Initialization
@@ -348,19 +372,34 @@ public final class SecurityMonitor: SecurityMonitorType {
             }
         }
 
+        // Build ThreatEvents for new threats
+        let events = pending.newThreats.map { threat in
+            ThreatEvent(
+                threat: threat,
+                severity: threat.severity,
+                detectedAt: pending.detectedAt,
+                evidence: evidence[threat] ?? []
+            )
+        }
+
+        // Record into ring buffer
+        if !events.isEmpty {
+            stateQueue.sync(flags: .barrier) {
+                _threatHistory.append(contentsOf: events)
+                if _threatHistory.count > _threatHistoryMaxSize {
+                    _threatHistory.removeFirst(_threatHistory.count - _threatHistoryMaxSize)
+                }
+            }
+        }
+
         guard pending.statusChange != nil || !pending.newThreats.isEmpty else { return }
         DispatchQueue.main.async {
             if let status = pending.statusChange {
                 statusHandler?(status)
             }
-            for threat in pending.newThreats {
+            for (threat, event) in zip(pending.newThreats, events) {
                 threatHandler?(threat)
-                threatEventHandler?(ThreatEvent(
-                    threat: threat,
-                    severity: threat.severity,
-                    detectedAt: pending.detectedAt,
-                    evidence: evidence[threat] ?? []
-                ))
+                threatEventHandler?(event)
             }
         }
     }

@@ -129,6 +129,20 @@ public final class DSK {
         return monitor.isSecure()
     }
 
+    public var threatHistory: [ThreatEvent] {
+        return monitor.threatHistory
+    }
+
+    @discardableResult
+    public func threatHistoryMaxSize(_ size: Int) -> Self {
+        monitor.threatHistoryMaxSize = size
+        return self
+    }
+
+    public func clearThreatHistory() {
+        monitor.clearThreatHistory()
+    }
+
     // MARK: - Async
 
     @available(iOS 15.0, *)
