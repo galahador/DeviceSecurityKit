@@ -120,6 +120,6 @@ public final class DSK {
     }
 
     public var isSecure: Bool {
-        return monitor.status.isSecure
+        return monitor.isSecure()
     }
 }
