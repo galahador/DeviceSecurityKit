@@ -122,4 +122,21 @@ public final class DSK {
     public var isSecure: Bool {
         return monitor.isSecure()
     }
+
+    // MARK: - Async
+
+    @available(iOS 15.0, *)
+    public func performCheckAsync() async -> SecurityResult {
+        await monitor.performCheckAsync()
+    }
+
+    @available(iOS 15.0, *)
+    public func isSecureAsync() async -> Bool {
+        await monitor.isSecureAsync()
+    }
+
+    @available(iOS 15.0, *)
+    public func attest(challengeHash: Data) async throws -> Data {
+        try await AttestationDetector.attest(challengeHash: challengeHash)
+    }
 }

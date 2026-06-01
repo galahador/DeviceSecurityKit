@@ -101,6 +101,17 @@ public final class AttestationDetector {
 #endif
     }
 
+    // MARK: - Public – async
+
+    @available(iOS 15.0, *)
+    public static func attest(challengeHash: Data) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            attest(challengeHash: challengeHash) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+
     // MARK: - Public – server-side outcome recording
 
     public static func markAttestationSucceeded() {

@@ -122,6 +122,27 @@ public final class SecurityMonitor: SecurityMonitorType {
         return performCheck().isSecure
     }
 
+    // MARK: - Async
+
+    @available(iOS 15.0, *)
+    public func performCheckAsync() async -> SecurityResult {
+        await withCheckedContinuation { continuation in
+            timerQueue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(returning: SecurityResult(threats: [], evidence: [:]))
+                    return
+                }
+                let result = self.performCheck()
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
+    @available(iOS 15.0, *)
+    public func isSecureAsync() async -> Bool {
+        await performCheckAsync().isSecure
+    }
+
     // MARK: - Monitoring
 
     public func startMonitoring() {

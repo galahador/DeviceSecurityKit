@@ -38,4 +38,10 @@ public protocol SecurityMonitorType {
     func removeCountermeasure(_ countermeasure: Countermeasure) -> Self
 
     func removeAllCountermeasures()
+
+    // MARK: - Async
+    @available(iOS 15.0, *)
+    func performCheckAsync() async -> SecurityResult
+    @available(iOS 15.0, *)
+    func isSecureAsync() async -> Bool
 }
