@@ -53,6 +53,12 @@ public final class DSK {
         return self
     }
 
+    @discardableResult
+    public func onThreatEvent(_ handler: @escaping (ThreatEvent) -> Void) -> Self {
+        monitor.onThreatEvent(handler)
+        return self
+    }
+
     // MARK: - Countermeasures
     @discardableResult
     public func countermeasure(

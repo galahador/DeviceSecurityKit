@@ -30,6 +30,7 @@ public final class SecurityMonitor: SecurityMonitorType {
     // MARK: - Handlers (protected by stateQueue)
     private var _onStatusChange: ((SecurityStatus) -> Void)?
     private var _onThreatDetected: ((SecurityThreat) -> Void)?
+    private var _onThreatEvent: ((ThreatEvent) -> Void)?
     private var _screenRecordingProvider: ScreenRecordingProvider? = DefaultScreenRecordingProvider()
     private var _countermeasures: [Countermeasure] = []
 
@@ -88,6 +89,12 @@ public final class SecurityMonitor: SecurityMonitorType {
         return self
     }
 
+    @discardableResult
+    public func onThreatEvent(_ handler: @escaping (ThreatEvent) -> Void) -> Self {
+        stateQueue.sync(flags: .barrier) { _onThreatEvent = handler }
+        return self
+    }
+
     // MARK: - Countermeasures
 
     @discardableResult
@@ -114,7 +121,7 @@ public final class SecurityMonitor: SecurityMonitorType {
     public func performCheck() -> SecurityResult {
         let result = gatherThreats()
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
-        firePending(pending)
+        firePending(pending, evidence: result.evidence)
         return result
     }
 
@@ -199,7 +206,7 @@ public final class SecurityMonitor: SecurityMonitorType {
         let result = gatherThreats()
         // Bug 6 fix: applyResult writes multiple state fields — needs .barrier.
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
-        firePending(pending)
+        firePending(pending, evidence: result.evidence)
     }
 
     private func gatherThreats() -> SecurityResult {
@@ -292,7 +299,8 @@ public final class SecurityMonitor: SecurityMonitorType {
     private func applyResult(_ result: SecurityResult) -> (
         statusChange: SecurityStatus?,
         newThreats: [SecurityThreat],
-        currentThreats: [SecurityThreat]
+        currentThreats: [SecurityThreat],
+        detectedAt: Date
     ) {
         let newStatus = mapToStatus(result)
         var statusChange: SecurityStatus?
@@ -315,18 +323,22 @@ public final class SecurityMonitor: SecurityMonitorType {
             _lastThreatCallbackTime[threat] = now
         }
 
-        return (statusChange, newThreats, Array(currentThreats))
+        return (statusChange, newThreats, Array(currentThreats), now)
     }
 
-    private func firePending(_ pending: (
-        statusChange: SecurityStatus?,
-        newThreats: [SecurityThreat],
-        currentThreats: [SecurityThreat]
-    )) {
+    private func firePending(
+        _ pending: (
+            statusChange: SecurityStatus?,
+            newThreats: [SecurityThreat],
+            currentThreats: [SecurityThreat],
+            detectedAt: Date
+        ),
+        evidence: [SecurityThreat: [String]]
+    ) {
         guard pending.statusChange != nil || !pending.newThreats.isEmpty || !pending.currentThreats.isEmpty else { return }
 
-        let (statusHandler, threatHandler, countermeasures) = stateQueue.sync {
-            (_onStatusChange, _onThreatDetected, _countermeasures)
+        let (statusHandler, threatHandler, threatEventHandler, countermeasures) = stateQueue.sync {
+            (_onStatusChange, _onThreatDetected, _onThreatEvent, _countermeasures)
         }
 
         for cm in countermeasures {
@@ -343,6 +355,12 @@ public final class SecurityMonitor: SecurityMonitorType {
             }
             for threat in pending.newThreats {
                 threatHandler?(threat)
+                threatEventHandler?(ThreatEvent(
+                    threat: threat,
+                    severity: threat.severity,
+                    detectedAt: pending.detectedAt,
+                    evidence: evidence[threat] ?? []
+                ))
             }
         }
     }
