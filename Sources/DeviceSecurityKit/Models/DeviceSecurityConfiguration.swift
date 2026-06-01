@@ -91,7 +91,17 @@ public struct DeviceSecurityConfiguration: Equatable {
         jailbreakCheckEnabled: true,
         debuggerCheckEnabled: true,
         emulatorCheckEnabled: true,
-        reverseEngineeringCheckEnabled: true
+        reverseEngineeringCheckEnabled: true,
+        appIntegrityCheckEnabled: true,
+        screenRecordingCheckEnabled: true,
+        hookDetectionEnabled: true,
+        pinningBypassDetectionEnabled: true,
+        vpnProxyDetectionEnabled: true,
+        swizzlingDetectionEnabled: true,
+        fridaDetectionEnabled: true,
+        fridaPortScanEnabled: true,
+        screenshotDetectionEnabled: true,
+        dylibInjectionDetectionEnabled: true
     )
     
     public static let disabled = DeviceSecurityConfiguration(

@@ -37,7 +37,7 @@
 | 👾 Frida Detection | Libraries, symbols, process checks, multi-port scanning |
 | 📺 Screen Recording | Active recording and mirroring detection |
 | 📸 Screenshot Detection | Real-time screenshot notifications |
-| 🌐 Pinning Bypass Detection | SSL/TLS interception and delegate integrity validation |
+| 🌐 Pinning Bypass Detection | Detects bypass tools (SSLKillSwitch, ssl-proxy, etc.) and proxy configurations — not a substitute for implementing certificate/public-key pinning in your networking stack |
 | 🔌 VPN / Proxy Detection | VPN interfaces and proxy configuration detection |
 | 🔐 App Attest | Apple App Attest validation |
 | 📦 Anti-Repackaging | Signing certificate verification |
