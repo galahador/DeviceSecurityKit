@@ -69,7 +69,8 @@ final class DeviceSecurityConfigurationTests: XCTestCase {
     }
 
     func testEquality() {
-        XCTAssertEqual(DeviceSecurityConfiguration.default, DeviceSecurityConfiguration.production)
+        // .production enables screenshotDetection (and others) that .default leaves off
+        XCTAssertNotEqual(DeviceSecurityConfiguration.default, DeviceSecurityConfiguration.production)
         XCTAssertNotEqual(DeviceSecurityConfiguration.default, DeviceSecurityConfiguration.disabled)
     }
 }
