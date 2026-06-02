@@ -10,11 +10,11 @@ import Foundation
 import UIKit
 #endif
 
-public protocol ScreenRecordingProvider {
+public protocol ScreenRecordingProvider: Sendable {
     func isScreenBeingRecorded() -> Bool
 }
 
-public struct DefaultScreenRecordingProvider: ScreenRecordingProvider {
+public struct DefaultScreenRecordingProvider: ScreenRecordingProvider, Sendable {
     public init() {}
 
     public func isScreenBeingRecorded() -> Bool {
