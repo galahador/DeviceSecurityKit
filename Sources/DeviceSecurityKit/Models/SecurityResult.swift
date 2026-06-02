@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct SecurityResult: Equatable {
+public struct SecurityResult: Equatable, Sendable {
     public let threats: [SecurityThreat]
     public let evidence: [SecurityThreat: [String]]
 

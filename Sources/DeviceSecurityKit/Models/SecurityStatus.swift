@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum SecurityStatus: Equatable {
+public enum SecurityStatus: Equatable, Sendable {
     case secure
     case jailbroken
     case debuggerAttached

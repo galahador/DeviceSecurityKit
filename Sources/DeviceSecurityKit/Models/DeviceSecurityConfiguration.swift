@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct DeviceSecurityConfiguration: Equatable, Codable {
+public struct DeviceSecurityConfiguration: Equatable, Codable, Sendable {
     public var jailbreakCheckEnabled: Bool
     public var debuggerCheckEnabled: Bool
     public var emulatorCheckEnabled: Bool

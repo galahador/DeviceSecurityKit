@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class SecurityMonitor: SecurityMonitorType {
+public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
 
     // MARK: - Private Properties
     private var monitoringTimer: DispatchSourceTimer?
@@ -43,7 +43,37 @@ public final class SecurityMonitor: SecurityMonitorType {
         stateQueue.sync { _status }
     }
 
-    public var monitoringInterval: TimeInterval = 60.0
+    // MARK: - Adaptive Interval
+    private var _currentInterval: TimeInterval = 60.0
+    private var _minInterval: TimeInterval = 5.0
+    private var _maxInterval: TimeInterval = 300.0
+    private var _baseInterval: TimeInterval = 60.0
+    private var _consecutiveCleanCycles: Int = 0
+
+    public var monitoringInterval: TimeInterval {
+        get { stateQueue.sync { _baseInterval } }
+        set {
+            stateQueue.sync(flags: .barrier) {
+                _baseInterval = newValue
+                _currentInterval = newValue
+                _consecutiveCleanCycles = 0
+            }
+        }
+    }
+
+    public var minMonitoringInterval: TimeInterval {
+        get { stateQueue.sync { _minInterval } }
+        set { stateQueue.sync(flags: .barrier) { _minInterval = max(newValue, 1.0) } }
+    }
+
+    public var maxMonitoringInterval: TimeInterval {
+        get { stateQueue.sync { _maxInterval } }
+        set { stateQueue.sync(flags: .barrier) { _maxInterval = newValue } }
+    }
+
+    public var currentMonitoringInterval: TimeInterval {
+        stateQueue.sync { _currentInterval }
+    }
 
     public var threatCallbackThrottleInterval: TimeInterval {
         get { stateQueue.sync { _threatCallbackThrottleInterval } }
@@ -196,19 +226,7 @@ public final class SecurityMonitor: SecurityMonitorType {
 
         // Run an immediate first check so the caller isn't blind for the first interval
         runChecks()
-
-        let timer = DispatchSource.makeTimerSource(queue: timerQueue)
-        timer.schedule(
-            deadline: .now() + monitoringInterval,
-            repeating: monitoringInterval
-        )
-
-        timer.setEventHandler { [weak self] in
-            self?.runChecks()
-        }
-
-        timer.resume()
-        timerQueue.sync { monitoringTimer = timer }
+        scheduleNextCheck()
     }
 
     public func stopMonitoring() {
@@ -216,8 +234,11 @@ public final class SecurityMonitor: SecurityMonitorType {
             monitoringTimer?.cancel()
             monitoringTimer = nil
         }
-        // Bug 6 fix: write needs .barrier.
-        stateQueue.sync(flags: .barrier) { isMonitoring = false }
+        stateQueue.sync(flags: .barrier) {
+            isMonitoring = false
+            _currentInterval = _baseInterval
+            _consecutiveCleanCycles = 0
+        }
 #if !DEBUG
         DebuggerDetector.stopContinuousDenyAttach()
 #endif
@@ -231,6 +252,40 @@ public final class SecurityMonitor: SecurityMonitorType {
         // Bug 6 fix: applyResult writes multiple state fields — needs .barrier.
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
         firePending(pending, evidence: result.evidence)
+
+        // Adapt interval based on threat presence
+        let hasThreats = !result.threats.isEmpty
+        stateQueue.sync(flags: .barrier) {
+            if hasThreats {
+                _consecutiveCleanCycles = 0
+                _currentInterval = _minInterval
+            } else {
+                _consecutiveCleanCycles += 1
+                // Exponential back-off: base * 2^cleanCycles, clamped to [min, max]
+                let backoff = _baseInterval * pow(2.0, Double(min(_consecutiveCleanCycles, 10)))
+                _currentInterval = min(max(backoff, _minInterval), _maxInterval)
+            }
+        }
+    }
+
+    /// Schedules the next one-shot check on `timerQueue`.
+    private func scheduleNextCheck() {
+        let interval = stateQueue.sync { _currentInterval }
+
+        let timer = DispatchSource.makeTimerSource(queue: timerQueue)
+        timer.schedule(deadline: .now() + interval)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.runChecks()
+            if self.stateQueue.sync(execute: { self.isMonitoring }) {
+                self.scheduleNextCheck()
+            }
+        }
+        timerQueue.async { [weak self] in
+            self?.monitoringTimer?.cancel()
+            self?.monitoringTimer = timer
+            timer.resume()
+        }
     }
 
     private func gatherThreats() -> SecurityResult {

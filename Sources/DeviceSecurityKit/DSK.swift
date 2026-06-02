@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class DSK {
+public final class DSK: DSKClient, @unchecked Sendable {
 
     // MARK: - Singleton
 
@@ -31,6 +31,22 @@ public final class DSK {
     public func monitoringInterval(_ interval: TimeInterval) -> Self {
         monitor.monitoringInterval = interval
         return self
+    }
+
+    @discardableResult
+    public func minMonitoringInterval(_ interval: TimeInterval) -> Self {
+        monitor.minMonitoringInterval = interval
+        return self
+    }
+
+    @discardableResult
+    public func maxMonitoringInterval(_ interval: TimeInterval) -> Self {
+        monitor.maxMonitoringInterval = interval
+        return self
+    }
+
+    public var currentMonitoringInterval: TimeInterval {
+        monitor.currentMonitoringInterval
     }
 
     @discardableResult
@@ -64,7 +80,7 @@ public final class DSK {
     public func countermeasure(
         for threat: SecurityThreat,
         throttled: Bool = true,
-        action: @escaping (SecurityThreat) -> Void
+        action: @escaping @Sendable (SecurityThreat) -> Void
     ) -> Self {
         monitor.addCountermeasure(Countermeasure(trigger: .threat(threat), throttled: throttled, action: action))
         return self
@@ -74,7 +90,7 @@ public final class DSK {
     public func countermeasure(
         forMinimumSeverity severity: ThreatSeverity,
         throttled: Bool = true,
-        action: @escaping (SecurityThreat) -> Void
+        action: @escaping @Sendable (SecurityThreat) -> Void
     ) -> Self {
         monitor.addCountermeasure(Countermeasure(trigger: .minimumSeverity(severity), throttled: throttled, action: action))
         return self
@@ -83,7 +99,7 @@ public final class DSK {
     @discardableResult
     public func countermeasure(
         throttled: Bool = true,
-        action: @escaping (SecurityThreat) -> Void
+        action: @escaping @Sendable (SecurityThreat) -> Void
     ) -> Self {
         monitor.addCountermeasure(Countermeasure(trigger: .anyThreat, throttled: throttled, action: action))
         return self
