@@ -77,7 +77,7 @@ https://github.com/galahador/DeviceSecurityKit.git
 3. Select:
 
 ```text
-from: "0.27.0"
+from: "0.28.0"
 ```
 
 4. Add Package
@@ -88,7 +88,7 @@ from: "0.27.0"
 dependencies: [
     .package(
         url: "https://github.com/galahador/DeviceSecurityKit.git",
-        from: "0.27.0"
+        from: "0.28.0"
     )
 ]
 ```
