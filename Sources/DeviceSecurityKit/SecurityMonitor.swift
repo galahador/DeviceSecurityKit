@@ -255,17 +255,18 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
 
         // Adapt interval based on threat presence
         let hasThreats = !result.threats.isEmpty
-        stateQueue.sync(flags: .barrier) {
+        let (interval, cycles) = stateQueue.sync(flags: .barrier) { () -> (TimeInterval, Int) in
             if hasThreats {
                 _consecutiveCleanCycles = 0
                 _currentInterval = _minInterval
             } else {
                 _consecutiveCleanCycles += 1
-                // Exponential back-off: base * 2^cleanCycles, clamped to [min, max]
                 let backoff = _baseInterval * pow(2.0, Double(min(_consecutiveCleanCycles, 10)))
                 _currentInterval = min(max(backoff, _minInterval), _maxInterval)
             }
+            return (_currentInterval, _consecutiveCleanCycles)
         }
+        Self.logger.debug("Adaptive interval: \(interval)s (cleanCycles: \(cycles), threats: \(hasThreats))")
     }
 
     /// Schedules the next one-shot check on `timerQueue`.
@@ -288,88 +289,138 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         }
     }
 
+    private static let logger = SecurityLogger.security(subsystem: "SecurityMonitor")
+
+    private static let detectorQueue = DispatchQueue(
+        label: "com.devicesecuritykit.monitor.detectors",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
+
+    private func runDetector<T>(timeout: TimeInterval, _ body: @escaping () -> T) -> T? {
+        var result: T?
+        let group = DispatchGroup()
+        group.enter()
+        Self.detectorQueue.async {
+            result = body()
+            group.leave()
+        }
+        let status = group.wait(timeout: .now() + timeout)
+        if status == .timedOut {
+            Self.logger.warning("Detector timed out after \(timeout)s")
+            return nil
+        }
+        return result
+    }
+
     private func gatherThreats() -> SecurityResult {
         let (cfg, provider) = stateQueue.sync { (configuration, _screenRecordingProvider) }
+        let timeout = cfg.detectorTimeout
         var threats: [SecurityThreat] = []
         var evidence: [SecurityThreat: [String]] = [:]
 
-        if cfg.jailbreakCheckEnabled && JailbreakDetector.isJailbroken() {
-            threats.append(.jailbreak)
-            evidence[.jailbreak] = JailbreakDetector.getDetectionDetails()
+        if cfg.jailbreakCheckEnabled {
+            if runDetector(timeout: timeout, { JailbreakDetector.isJailbroken() }) == true {
+                threats.append(.jailbreak)
+                evidence[.jailbreak] = JailbreakDetector.getDetectionDetails()
+            }
         }
-        if cfg.debuggerCheckEnabled && DebuggerDetector.isDebuggerAttached() {
-            threats.append(.debugger)
-            let results = DebuggerDetector.getDetectionResults()
-            evidence[.debugger] = results.filter { $0.value }.map { $0.key }
+        if cfg.debuggerCheckEnabled {
+            if runDetector(timeout: timeout, { DebuggerDetector.isDebuggerAttached() }) == true {
+                threats.append(.debugger)
+                let results = DebuggerDetector.getDetectionResults()
+                evidence[.debugger] = results.filter { $0.value }.map { $0.key }
+            }
         }
         #if !DEBUG
         if cfg.emulatorCheckEnabled {
-            let result = EmulatorDetector.detectEmulator()
-            if result.isEmulator {
+            if let result = runDetector(timeout: timeout, { EmulatorDetector.detectEmulator() }),
+               result.isEmulator {
                 threats.append(.emulator)
                 evidence[.emulator] = result.detectionMethods
             }
         }
         #endif
-        if cfg.reverseEngineeringCheckEnabled && ReverseEngineeringDetector.isReverseEngineered() {
-            threats.append(.reverseEngineering)
-            evidence[.reverseEngineering] = ["reverseEngineeringToolDetected"]
+        if cfg.reverseEngineeringCheckEnabled {
+            if runDetector(timeout: timeout, { ReverseEngineeringDetector.isReverseEngineered() }) == true {
+                threats.append(.reverseEngineering)
+                evidence[.reverseEngineering] = ["reverseEngineeringToolDetected"]
+            }
         }
-        if cfg.appIntegrityCheckEnabled && AppIntegrityDetector.isIntegrityCompromised(expectedTeamID: cfg.expectedTeamID) {
-            threats.append(.appIntegrity)
-            evidence[.appIntegrity] = ["integrityCheckFailed"]
+        if cfg.appIntegrityCheckEnabled {
+            if runDetector(timeout: timeout, { AppIntegrityDetector.isIntegrityCompromised(expectedTeamID: cfg.expectedTeamID) }) == true {
+                threats.append(.appIntegrity)
+                evidence[.appIntegrity] = ["integrityCheckFailed"]
+            }
         }
-        if cfg.screenRecordingCheckEnabled,
-           let provider,
-           provider.isScreenBeingRecorded() {
-            threats.append(.screenRecording)
-            evidence[.screenRecording] = ["screenBeingRecorded"]
+        if cfg.screenRecordingCheckEnabled, let provider {
+            if runDetector(timeout: timeout, { provider.isScreenBeingRecorded() }) == true {
+                threats.append(.screenRecording)
+                evidence[.screenRecording] = ["screenBeingRecorded"]
+            }
         }
-        if cfg.hookDetectionEnabled && HookDetector.isFunctionHooked() {
-            threats.append(.hooked)
-            evidence[.hooked] = HookDetector.collectEvidence()
+        if cfg.hookDetectionEnabled {
+            if runDetector(timeout: timeout, { HookDetector.isFunctionHooked() }) == true {
+                threats.append(.hooked)
+                evidence[.hooked] = HookDetector.collectEvidence()
+            }
         }
-        if cfg.pinningBypassDetectionEnabled && CertificatePinningDetector.isPinningBypassed() {
-            threats.append(.pinningBypassed)
-            evidence[.pinningBypassed] = ["pinningBypassDetected"]
+        if cfg.pinningBypassDetectionEnabled {
+            if runDetector(timeout: timeout, { CertificatePinningDetector.isPinningBypassed() }) == true {
+                threats.append(.pinningBypassed)
+                evidence[.pinningBypassed] = ["pinningBypassDetected"]
+            }
         }
         if cfg.vpnProxyDetectionEnabled {
-            if VPNProxyDetector.isVPNActive(allowedVPNBundleIDs: cfg.allowedVPNBundleIDs) {
+            if runDetector(timeout: timeout, { VPNProxyDetector.isVPNActive(allowedVPNBundleIDs: cfg.allowedVPNBundleIDs) }) == true {
                 threats.append(.vpnDetected)
                 evidence[.vpnDetected] = ["vpnConnectionActive"]
             }
-            if VPNProxyDetector.isProxyActive() {
+            if runDetector(timeout: timeout, { VPNProxyDetector.isProxyActive() }) == true {
                 threats.append(.proxyDetected)
                 evidence[.proxyDetected] = ["proxyConfigured"]
             }
         }
-        if cfg.swizzlingDetectionEnabled && SwizzlingDetector.isSwizzled() {
-            threats.append(.methodSwizzling)
-            evidence[.methodSwizzling] = ["methodSwizzlingDetected"]
+        if cfg.swizzlingDetectionEnabled {
+            if runDetector(timeout: timeout, { SwizzlingDetector.isSwizzled() }) == true {
+                threats.append(.methodSwizzling)
+                evidence[.methodSwizzling] = ["methodSwizzlingDetected"]
+            }
         }
-        if cfg.fridaDetectionEnabled && FridaDetector.isFridaDetected(portScanEnabled: cfg.fridaPortScanEnabled, ports: cfg.fridaPorts) {
-            threats.append(.fridaDetected)
-            evidence[.fridaDetected] = FridaDetector.collectEvidence(portScanEnabled: cfg.fridaPortScanEnabled, ports: cfg.fridaPorts)
+        if cfg.fridaDetectionEnabled {
+            if runDetector(timeout: timeout, { FridaDetector.isFridaDetected(portScanEnabled: cfg.fridaPortScanEnabled, ports: cfg.fridaPorts) }) == true {
+                threats.append(.fridaDetected)
+                evidence[.fridaDetected] = FridaDetector.collectEvidence(portScanEnabled: cfg.fridaPortScanEnabled, ports: cfg.fridaPorts)
+            }
         }
-        if cfg.attestationCheckEnabled && AttestationDetector.isAttestationFailed() {
-            threats.append(.attestationFailed)
-            evidence[.attestationFailed] = ["attestationFailed"]
+        if cfg.attestationCheckEnabled {
+            if runDetector(timeout: timeout, { AttestationDetector.isAttestationFailed() }) == true {
+                threats.append(.attestationFailed)
+                evidence[.attestationFailed] = ["attestationFailed"]
+            }
         }
-        if DSKIntegrityChecker.isDSKCompromised() {
+        // DSK integrity always runs — not gated by config
+        if runDetector(timeout: timeout, { DSKIntegrityChecker.isDSKCompromised() }) == true {
             threats.append(.dskTampered)
             evidence[.dskTampered] = ["dskIntegrityCheckFailed"]
         }
-        if cfg.antiRepackagingEnabled && RepackagingDetector.isRepackaged(expectedCertificateHash: cfg.expectedCertificateHash) {
-            threats.append(.repackaged)
-            evidence[.repackaged] = ["signingCertificateMismatch"]
+        if cfg.antiRepackagingEnabled {
+            if runDetector(timeout: timeout, { RepackagingDetector.isRepackaged(expectedCertificateHash: cfg.expectedCertificateHash) }) == true {
+                threats.append(.repackaged)
+                evidence[.repackaged] = ["signingCertificateMismatch"]
+            }
         }
-        if cfg.screenshotDetectionEnabled && ScreenshotDetector.wasScreenshotTaken() {
-            threats.append(.screenshotTaken)
-            evidence[.screenshotTaken] = ["screenshotDetectedInWindow"]
+        if cfg.screenshotDetectionEnabled {
+            if runDetector(timeout: timeout, { ScreenshotDetector.wasScreenshotTaken() }) == true {
+                threats.append(.screenshotTaken)
+                evidence[.screenshotTaken] = ["screenshotDetectedInWindow"]
+            }
         }
-        if cfg.dylibInjectionDetectionEnabled && DylibInjectionDetector.isDylibInjected() {
-            threats.append(.dylibInjection)
-            evidence[.dylibInjection] = DylibInjectionDetector.collectEvidence()
+        if cfg.dylibInjectionDetectionEnabled {
+            if runDetector(timeout: timeout, { DylibInjectionDetector.isDylibInjected() }) == true {
+                threats.append(.dylibInjection)
+                evidence[.dylibInjection] = DylibInjectionDetector.collectEvidence()
+            }
         }
 
         return SecurityResult(threats: threats, evidence: evidence)
@@ -420,13 +471,6 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             (_onStatusChange, _onThreatDetected, _onThreatEvent, _countermeasures)
         }
 
-        for cm in countermeasures {
-            let targets = cm.throttled ? pending.newThreats : pending.currentThreats
-            for threat in targets where cm.matches(threat) {
-                cm.action(threat)
-            }
-        }
-
         // Build ThreatEvents for new threats
         let events = pending.newThreats.map { threat in
             ThreatEvent(
@@ -447,8 +491,16 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
 
-        guard pending.statusChange != nil || !pending.newThreats.isEmpty else { return }
+        guard pending.statusChange != nil || !pending.newThreats.isEmpty || !countermeasures.isEmpty else { return }
         DispatchQueue.main.async {
+            // Countermeasures fire on main thread so UI work is safe
+            for cm in countermeasures {
+                let targets = cm.throttled ? pending.newThreats : pending.currentThreats
+                for threat in targets where cm.matches(threat) {
+                    cm.action(threat)
+                }
+            }
+
             if let status = pending.statusChange {
                 statusHandler?(status)
             }

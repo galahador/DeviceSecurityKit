@@ -22,6 +22,9 @@ public protocol DSKClient: AnyObject {
     @discardableResult func onThreatEvent(_ handler: @escaping (ThreatEvent) -> Void) -> Self
 
     // MARK: - Countermeasures
+    @discardableResult func countermeasure(for threat: SecurityThreat, throttled: Bool, action: @escaping @Sendable (SecurityThreat) -> Void) -> Self
+    @discardableResult func countermeasure(forMinimumSeverity severity: ThreatSeverity, throttled: Bool, action: @escaping @Sendable (SecurityThreat) -> Void) -> Self
+    @discardableResult func countermeasure(throttled: Bool, action: @escaping @Sendable (SecurityThreat) -> Void) -> Self
     @discardableResult func addCountermeasure(_ countermeasure: Countermeasure) -> Self
     @discardableResult func removeCountermeasure(_ countermeasure: Countermeasure) -> Self
     func removeAllCountermeasures()
