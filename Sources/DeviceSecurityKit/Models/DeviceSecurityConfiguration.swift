@@ -29,6 +29,7 @@ public struct DeviceSecurityConfiguration: Equatable, Codable, Sendable {
     public var expectedCertificateHash: String?
     public var screenshotDetectionEnabled: Bool
     public var dylibInjectionDetectionEnabled: Bool
+    public var detectorTimeout: TimeInterval
 
     public init(
         jailbreakCheckEnabled: Bool = true,
@@ -51,7 +52,8 @@ public struct DeviceSecurityConfiguration: Equatable, Codable, Sendable {
         antiRepackagingEnabled: Bool = false,
         expectedCertificateHash: String? = nil,
         screenshotDetectionEnabled: Bool = false,
-        dylibInjectionDetectionEnabled: Bool = true
+        dylibInjectionDetectionEnabled: Bool = true,
+        detectorTimeout: TimeInterval = 5.0
     ) {
         self.jailbreakCheckEnabled = jailbreakCheckEnabled
         self.debuggerCheckEnabled = debuggerCheckEnabled
@@ -74,6 +76,7 @@ public struct DeviceSecurityConfiguration: Equatable, Codable, Sendable {
         self.expectedCertificateHash = expectedCertificateHash
         self.screenshotDetectionEnabled = screenshotDetectionEnabled
         self.dylibInjectionDetectionEnabled = dylibInjectionDetectionEnabled
+        self.detectorTimeout = detectorTimeout
     }
     
     // MARK: - Presets
@@ -216,6 +219,12 @@ public struct DeviceSecurityConfiguration: Equatable, Codable, Sendable {
     public func withDylibInjectionDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.dylibInjectionDetectionEnabled = enabled
+        return config
+    }
+
+    public func withDetectorTimeout(_ timeout: TimeInterval) -> DeviceSecurityConfiguration {
+        var config = self
+        config.detectorTimeout = timeout
         return config
     }
 }

@@ -44,6 +44,13 @@ internal struct DSKIntegrityChecker {
             unsafeBitCast(ReverseEngineeringDetector.isReverseEngineered as () -> Bool, to: UnsafeRawPointer.self),
             unsafeBitCast(EmulatorDetector.isEmulator as () -> Bool, to: UnsafeRawPointer.self),
             unsafeBitCast(AttestationDetector.isAttestationFailed as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(AppIntegrityDetector.isIntegrityCompromised as (String?) -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(VPNProxyDetector.isVPNActive as ([String]) -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(VPNProxyDetector.isProxyActive as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(RepackagingDetector.isRepackaged as (String?) -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(DylibInjectionDetector.isDylibInjected as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(ScreenshotDetector.wasScreenshotTaken as () -> Bool, to: UnsafeRawPointer.self),
+            unsafeBitCast(ProxyConfigurationChecker.isProxyConfigured as () -> Bool, to: UnsafeRawPointer.self),
         ]
 
         for funcPtr in criticalFunctions {
