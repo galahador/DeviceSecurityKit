@@ -13,6 +13,9 @@ public final class DylibInjectionDetector {
 
     private static let logger = SecurityLogger.security(subsystem: "DylibInjectionDetector")
 
+    /// Not defined in the MachO Swift module; value from `<mach-o/loader.h>`.
+    private static let LC_LAZY_LOAD_DYLIB: UInt32 = 0x20
+
     // MARK: - Public
 
     public static func isDylibInjected() -> Bool {
@@ -63,13 +66,11 @@ public final class DylibInjectionDetector {
             let headerSize: Int
             let ncmds: UInt32
             if magic == MH_MAGIC_64 {
-                let hdr = rawPtr.assumingMemoryBound(to: mach_header_64.self)
                 headerSize = MemoryLayout<mach_header_64>.size
-                ncmds = hdr.pointee.ncmds
+                ncmds = rawPtr.load(fromByteOffset: MemoryLayout.offset(of: \mach_header_64.ncmds)!, as: UInt32.self)
             } else if magic == MH_MAGIC {
-                let hdr = rawPtr.assumingMemoryBound(to: mach_header.self)
                 headerSize = MemoryLayout<mach_header>.size
-                ncmds = hdr.pointee.ncmds
+                ncmds = rawPtr.load(fromByteOffset: MemoryLayout.offset(of: \mach_header.ncmds)!, as: UInt32.self)
             } else {
                 return evidence
             }
@@ -78,11 +79,11 @@ public final class DylibInjectionDetector {
             for _ in 0..<ncmds {
                 let cmd = cmdPtr.load(as: UInt32.self)
                 let cmdsize = cmdPtr.load(fromByteOffset: 4, as: UInt32.self)
-                guard cmdsize >= 8 else { break }
+                guard cmdsize >= 12 else { break }
 
-                if cmd == LC_LOAD_DYLIB || cmd == LC_LOAD_WEAK_DYLIB || cmd == LC_REEXPORT_DYLIB || cmd == UInt32(0x20) {
+                if cmd == LC_LOAD_DYLIB || cmd == LC_LOAD_WEAK_DYLIB || cmd == LC_REEXPORT_DYLIB || cmd == LC_LAZY_LOAD_DYLIB {
                     let nameOffset = Int(cmdPtr.load(fromByteOffset: 8, as: UInt32.self))
-                    if nameOffset < Int(cmdsize) {
+                    if nameOffset >= 12, nameOffset < Int(cmdsize) {
                         let namePtr = cmdPtr.advanced(by: nameOffset).assumingMemoryBound(to: CChar.self)
                         let dylibPath = String(cString: namePtr)
                         if !isExpectedDylibPath(dylibPath) {
@@ -148,13 +149,11 @@ public final class DylibInjectionDetector {
         let headerSize: Int
         let ncmds: UInt32
         if magic == MH_MAGIC_64 {
-            let hdr = rawPtr.assumingMemoryBound(to: mach_header_64.self)
             headerSize = MemoryLayout<mach_header_64>.size
-            ncmds = hdr.pointee.ncmds
+            ncmds = rawPtr.load(fromByteOffset: MemoryLayout.offset(of: \mach_header_64.ncmds)!, as: UInt32.self)
         } else if magic == MH_MAGIC {
-            let hdr = rawPtr.assumingMemoryBound(to: mach_header.self)
             headerSize = MemoryLayout<mach_header>.size
-            ncmds = hdr.pointee.ncmds
+            ncmds = rawPtr.load(fromByteOffset: MemoryLayout.offset(of: \mach_header.ncmds)!, as: UInt32.self)
         } else {
             return false
         }
@@ -164,12 +163,12 @@ public final class DylibInjectionDetector {
         for _ in 0..<ncmds {
             let cmd = cmdPtr.load(as: UInt32.self)
             let cmdsize = cmdPtr.load(fromByteOffset: 4, as: UInt32.self)
-            guard cmdsize >= 8 else { break }
+            guard cmdsize >= 12 else { break }
 
-            if cmd == LC_LOAD_DYLIB || cmd == LC_LOAD_WEAK_DYLIB || cmd == LC_REEXPORT_DYLIB || cmd == UInt32(0x20) /* LC_LAZY_LOAD_DYLIB */ {
+            if cmd == LC_LOAD_DYLIB || cmd == LC_LOAD_WEAK_DYLIB || cmd == LC_REEXPORT_DYLIB || cmd == LC_LAZY_LOAD_DYLIB {
                 // dylib_command: cmd(4) + cmdsize(4) + name_offset(4) + timestamp(4) + versions(8)
                 let nameOffset = Int(cmdPtr.load(fromByteOffset: 8, as: UInt32.self))
-                guard nameOffset < Int(cmdsize) else { break }
+                guard nameOffset >= 12, nameOffset < Int(cmdsize) else { break }
                 let namePtr = cmdPtr.advanced(by: nameOffset).assumingMemoryBound(to: CChar.self)
                 let dylibPath = String(cString: namePtr)
 

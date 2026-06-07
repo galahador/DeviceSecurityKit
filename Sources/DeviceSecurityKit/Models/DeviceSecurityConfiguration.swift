@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct DeviceSecurityConfiguration: Equatable, Codable, Sendable {
+public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public var jailbreakCheckEnabled: Bool
     public var debuggerCheckEnabled: Bool
     public var emulatorCheckEnabled: Bool
@@ -103,10 +103,30 @@ public struct DeviceSecurityConfiguration: Equatable, Codable, Sendable {
         swizzlingDetectionEnabled: true,
         fridaDetectionEnabled: true,
         fridaPortScanEnabled: true,
+        attestationCheckEnabled: true,
+        antiRepackagingEnabled: true,
         screenshotDetectionEnabled: true,
         dylibInjectionDetectionEnabled: true
     )
     
+    /// Lightweight preset: only jailbreak and debugger detection.
+    public static let minimal = DeviceSecurityConfiguration(
+        jailbreakCheckEnabled: true,
+        debuggerCheckEnabled: true,
+        emulatorCheckEnabled: false,
+        reverseEngineeringCheckEnabled: false,
+        appIntegrityCheckEnabled: false,
+        screenRecordingCheckEnabled: false,
+        hookDetectionEnabled: false,
+        pinningBypassDetectionEnabled: false,
+        vpnProxyDetectionEnabled: false,
+        swizzlingDetectionEnabled: false,
+        fridaDetectionEnabled: false,
+        fridaPortScanEnabled: false,
+        screenshotDetectionEnabled: false,
+        dylibInjectionDetectionEnabled: false
+    )
+
     public static let disabled = DeviceSecurityConfiguration(
         jailbreakCheckEnabled: false,
         debuggerCheckEnabled: false,
@@ -225,6 +245,18 @@ public struct DeviceSecurityConfiguration: Equatable, Codable, Sendable {
     public func withDetectorTimeout(_ timeout: TimeInterval) -> DeviceSecurityConfiguration {
         var config = self
         config.detectorTimeout = timeout
+        return config
+    }
+
+    public func withExpectedTeamID(_ teamID: String?) -> DeviceSecurityConfiguration {
+        var config = self
+        config.expectedTeamID = teamID
+        return config
+    }
+
+    public func withExpectedFileHashes(_ hashes: [String: String]) -> DeviceSecurityConfiguration {
+        var config = self
+        config.expectedFileHashes = hashes
         return config
     }
 }

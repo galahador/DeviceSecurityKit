@@ -15,6 +15,7 @@ public final class JailbreakDetector {
     
     // MARK: - Private Properties
     private static let jailbreakListOptions = JailbreakListOptions()
+    private static let logger = SecurityLogger.security(subsystem: "JailbreakDetector")
     
     // MARK: - URL Scheme Checker
     private static let _urlSchemeChecker: ((URL) -> Bool)? = defaultURLSchemeChecker()
@@ -152,7 +153,10 @@ public final class JailbreakDetector {
     }
     
     private static func checkSuspiciousURLSchemes() -> Bool {
-        guard let checker = _urlSchemeChecker else { return false }
+        guard let checker = _urlSchemeChecker else {
+            logger.debug("URL scheme check skipped — checker unavailable (simulator, or LSApplicationQueriesSchemes not configured in Info.plist)")
+            return false
+        }
         
         for scheme in jailbreakListOptions.urlSchemes {
             if let url = URL(string: scheme), checker(url) {

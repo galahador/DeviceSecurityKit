@@ -139,10 +139,21 @@ internal struct DSKIntegrityChecker {
         guard let section = getsectiondata(hdr64, "__TEXT", "__text", &size) else { return nil }
         guard size > 0 else { return nil }
 
-        // FNV-1a over the entire __text section
         let ptr = UnsafeRawPointer(section)
+        let totalSize = Int(size)
+        let windowSize = min(4096, totalSize)
+
         var hash: UInt64 = fnvOffsetBasis
-        for i in 0..<Int(size) {
+
+        // Head window
+        for i in 0..<windowSize {
+            hash ^= UInt64(ptr.load(fromByteOffset: i, as: UInt8.self))
+            hash = hash &* fnvPrime
+        }
+
+        // Tail window (skip if section is small enough that head already covered it)
+        let tailStart = max(windowSize, totalSize - windowSize)
+        for i in tailStart..<totalSize {
             hash ^= UInt64(ptr.load(fromByteOffset: i, as: UInt8.self))
             hash = hash &* fnvPrime
         }

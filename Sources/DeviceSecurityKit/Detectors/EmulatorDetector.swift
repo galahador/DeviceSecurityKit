@@ -32,6 +32,10 @@ public final class EmulatorDetector {
     private static let logger = SecurityLogger.detection(subsystem: "DeviceSecurityKit")
     private static let emulatorDetectorListOptions = EmulatorDetectorListOptions()
 
+    /// Minimum number of independent detection methods that must trigger before
+    /// flagging as emulator. Default is 2 to reduce single-signal false positives.
+    public static var minimumDetectionMethods: Int = 2
+
     private static var cachedDeviceModel: String?
     private static let cacheQueue = DispatchQueue(label: "com.devicesecuritykit.emulator.cache", attributes: .concurrent)
 
@@ -127,7 +131,7 @@ public final class EmulatorDetector {
         }
 
         let confidence = min(confidenceScore / maxConfidenceScore, 1.0)
-        let isEmulator = detectionMethods.count >= 2
+        let isEmulator = detectionMethods.count >= minimumDetectionMethods
 
         let result = DetectionResult(
             isEmulator: isEmulator,
@@ -349,10 +353,7 @@ public final class EmulatorDetector {
     // MARK: - Helper Methods
 
     private static func getDeviceModelIdentifier() -> String {
-        if let cached = cacheQueue.sync(execute: { cachedDeviceModel }) {
-            return cached
-        }
-
+        // Single barrier call to avoid TOCTOU: read-or-populate atomically.
         return cacheQueue.sync(flags: .barrier) {
             if let cached = cachedDeviceModel {
                 return cached

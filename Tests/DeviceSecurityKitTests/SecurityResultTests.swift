@@ -11,7 +11,7 @@ import XCTest
 final class SecurityResultTests: XCTestCase {
 
     func testSecureWhenNoThreats() {
-        let result = SecurityResult(threats: [.noThreat])
+        let result = SecurityResult(threats: [])
         XCTAssertTrue(result.isSecure)
         XCTAssertFalse(result.isJailbroken)
         XCTAssertFalse(result.isDebuggerAttached)

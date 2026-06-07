@@ -10,6 +10,7 @@ import Foundation
 public protocol DSKClient: AnyObject {
 
     // MARK: - Configuration
+    func currentConfiguration() -> DeviceSecurityConfiguration
     @discardableResult func configure(_ configuration: DeviceSecurityConfiguration) -> Self
     @discardableResult func monitoringInterval(_ interval: TimeInterval) -> Self
     @discardableResult func minMonitoringInterval(_ interval: TimeInterval) -> Self

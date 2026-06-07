@@ -14,6 +14,11 @@ public final class DebuggerDetector {
     private static let logger = SecurityLogger.security(subsystem: "DebuggerDetector")
     private static let debuggerDetectorList = DebuggerDetectorList()
     
+    /// Timing analysis ratio threshold. A test/baseline ratio above this value
+    /// triggers detection. Default is 10. Lower values increase sensitivity but
+    /// also increase false positives on slow or thermally-throttled devices.
+    public static var timingThreshold: UInt64 = 10
+
     private static let denyAttachQueue = DispatchQueue(label: "DebuggerDetector.denyAttach", qos: .background)
     private static var denyAttachTimer: DispatchSourceTimer?
     
@@ -219,7 +224,7 @@ public final class DebuggerDetector {
         guard baselineMedian > 0 else { return false }
         let ratio = testMedian / baselineMedian
 
-        let detected = ratio > 10
+        let detected = ratio > timingThreshold
         if detected {
             logger.info("Timing analysis: test/baseline ratio \(ratio)x exceeds threshold")
         }

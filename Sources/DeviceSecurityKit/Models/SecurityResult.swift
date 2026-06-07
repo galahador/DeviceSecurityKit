@@ -22,7 +22,7 @@ public struct SecurityResult: Equatable, Codable, Sendable {
     }
     
     public var isSecure: Bool {
-        return threats.isEmpty || !threats.contains(where: { $0 != .noThreat })
+        return threats.isEmpty
     }
     
     public var isJailbroken: Bool {
@@ -97,6 +97,18 @@ public struct SecurityResult: Equatable, Codable, Sendable {
         return threats.contains(.dylibInjection)
     }
 
+    // MARK: - Threat Queries
+
+    /// Returns threats matching the given severity level.
+    public func threats(bySeverity severity: ThreatSeverity) -> [SecurityThreat] {
+        return threats.filter { $0.severity == severity }
+    }
+
+    /// Number of critical-severity threats in this result.
+    public var criticalThreatCount: Int {
+        return threats.count { $0.severity == .critical }
+    }
+
     // MARK: - Risk Score
 
     /// Composite risk score in `[0.0, 1.0]` derived from active threats.
@@ -120,7 +132,7 @@ public struct SecurityResult: Equatable, Codable, Sendable {
     /// | Two critical threats         | ~0.82             |
     /// | Three+ critical threats      | 0.90 – 1.0       |
     public var riskScore: Double {
-        let active = threats.filter { $0 != .noThreat }
+        let active = threats
         guard !active.isEmpty else { return 0.0 }
 
         let maxSeverity = active.map { $0.severity.rawValue }.max() ?? 0

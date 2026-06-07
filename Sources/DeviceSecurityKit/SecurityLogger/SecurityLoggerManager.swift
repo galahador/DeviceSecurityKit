@@ -11,12 +11,12 @@ public final class SecurityLoggerManager {
     public static let shared = SecurityLoggerManager()
     
     private var configuration: SecurityLoggerConfiguration = .default
-    private let configurationQueue = DispatchQueue(label: "SecurityLogger.config", qos: .utility)
+    private let configurationQueue = DispatchQueue(label: "SecurityLogger.config", qos: .utility, attributes: .concurrent)
     
     private init() {}
     
     public func configure(_ configuration: SecurityLoggerConfiguration) {
-        configurationQueue.sync {
+        configurationQueue.sync(flags: .barrier) {
             self.configuration = configuration
         }
     }

@@ -10,7 +10,7 @@ import Foundation
 public struct Countermeasure: Equatable, Sendable {
 
     // MARK: - Trigger
-    public enum Trigger: Sendable {
+    public enum Trigger: Equatable, Sendable {
         case threat(SecurityThreat)
         case minimumSeverity(ThreatSeverity)
         case anyThreat
@@ -29,7 +29,7 @@ public struct Countermeasure: Equatable, Sendable {
         action: @escaping @Sendable (SecurityThreat) -> Void
     ) {
         if case .threat(let t) = trigger {
-            assert(t != .noThreat, "Countermeasures cannot target .noThreat — it is never emitted.")
+            assert(t.rawValue != "noThreat", "Countermeasures cannot target .noThreat — it is never emitted.")
         }
         self.id        = UUID()
         self.trigger   = trigger

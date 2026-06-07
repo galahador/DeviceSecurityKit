@@ -18,7 +18,7 @@ final class SecurityThreatTests: XCTestCase {
         XCTAssertEqual(SecurityThreat.debugger.severity, .high)
         XCTAssertEqual(SecurityThreat.screenRecording.severity, .high)
         XCTAssertEqual(SecurityThreat.emulator.severity, .medium)
-        XCTAssertEqual(SecurityThreat.noThreat.severity, .normal)
+        XCTAssertEqual(SecurityThreat(rawValue: "noThreat")?.severity, .normal)
     }
 
     func testSeverityComparison() {
@@ -42,9 +42,16 @@ final class SecurityThreatTests: XCTestCase {
     }
 
     func testAllCasesCount() {
-        XCTAssertEqual(SecurityThreat.allCases.count, 18)
-        let set: Set<SecurityThreat> = [.jailbreak, .jailbreak, .debugger, .screenRecording]
-        XCTAssertEqual(set.count, 3)
+        var expectedThreats: Set<SecurityThreat> = [
+            .jailbreak, .debugger, .emulator, .reverseEngineering, .appIntegrity,
+            .screenRecording, .hooked, .pinningBypassed, .vpnDetected, .proxyDetected,
+            .methodSwizzling, .fridaDetected, .attestationFailed, .dskTampered,
+            .repackaged, .screenshotTaken, .dylibInjection
+        ]
+        if let legacy = SecurityThreat(rawValue: "noThreat") {
+            expectedThreats.insert(legacy)
+        }
+        XCTAssertEqual(Set(SecurityThreat.allCases), expectedThreats)
     }
 
     // MARK: - Risk Score
@@ -56,7 +63,8 @@ final class SecurityThreatTests: XCTestCase {
     }
 
     func testRiskScore_noThreatOnly() {
-        let result = SecurityResult(threats: [.noThreat])
+        // .noThreat is deprecated — verify empty array gives secure result
+        let result = SecurityResult(threats: [])
         XCTAssertEqual(result.riskScore, 0.0)
         XCTAssertEqual(result.riskLevel, .none)
     }
