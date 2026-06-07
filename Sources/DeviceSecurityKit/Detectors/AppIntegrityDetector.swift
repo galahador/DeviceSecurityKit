@@ -13,6 +13,17 @@ public final class AppIntegrityDetector {
 
     private static let logger = SecurityLogger.security(subsystem: "AppIntegrityDetector")
 
+    private static let cachedCodeResources: [String: Any]? = {
+        let path = Bundle.main.bundlePath + "/_CodeSignature/CodeResources"
+        guard let data = FileManager.default.contents(atPath: path),
+              let plist = try? PropertyListSerialization.propertyList(
+                  from: data, options: [], format: nil
+              ) as? [String: Any] else {
+            return nil
+        }
+        return plist
+    }()
+
     // MARK: - Public
 
     public static func isIntegrityCompromised(expectedTeamID: String? = nil) -> Bool {
@@ -43,15 +54,11 @@ public final class AppIntegrityDetector {
 #if targetEnvironment(simulator)
         return false
 #else
-        let bundlePath = Bundle.main.bundlePath
-        let codeResourcesPath = bundlePath + "/_CodeSignature/CodeResources"
-
-        guard let data = FileManager.default.contents(atPath: codeResourcesPath),
-              let plist = try? PropertyListSerialization.propertyList(
-                  from: data, options: [], format: nil
-              ) as? [String: Any] else {
+        guard let plist = cachedCodeResources else {
             return false // presence check already handles missing file
         }
+
+        let bundlePath = Bundle.main.bundlePath
 
         // CodeResources has "files2" dict with SHA256 hashes
         guard let files2 = plist["files2"] as? [String: Any] else {
@@ -200,9 +207,11 @@ public final class AppIntegrityDetector {
         if let result = extractXMLPlist(from: data) {
             return result
         }
+        logger.debug("XML plist extraction failed for mobileprovision — trying binary plist")
         if let result = extractBinaryPlist(from: data) {
             return result
         }
+        logger.debug("Binary plist extraction also failed for mobileprovision")
         return nil
     }
 

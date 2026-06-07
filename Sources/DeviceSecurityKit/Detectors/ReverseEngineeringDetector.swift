@@ -20,6 +20,7 @@ public final class ReverseEngineeringDetector {
         return checkSuspiciousLibraries()
             || checkEnvironmentVariables()
             || checkCodeIntegrity()
+            || checkInstrumentationClasses()
     }
     
     // MARK: - Private
@@ -69,6 +70,29 @@ public final class ReverseEngineeringDetector {
         ]
     }()
     
+    // MARK: - Check: Instrumentation frameworks (FLEX, Reveal, DCIntrospect)
+
+    private static func checkInstrumentationClasses() -> Bool {
+#if !DEBUG
+        let o = StringObfuscator.shared
+        let suspiciousClassPrefixes = [
+            o.reveal([0x45, 0x82, 0xF2, 0xD5, 0xBB, 0x3D, 0xC4, 0x19, 0xF2, 0x12, 0x3C, 0xD2, 0x90, 0xA7, 0x46]),
+            o.reveal([0xB8, 0xE5, 0x90, 0x5D, 0x1E, 0xAC, 0x6D, 0x3C, 0x3F, 0x96, 0x0D, 0x6E, 0xD7, 0xD8, 0xB8, 0xF7]),
+            o.reveal([0x69, 0xFF, 0x9C, 0x1C, 0x7A, 0xAD, 0xA4, 0x45, 0x58, 0x1F, 0x5F, 0xCC, 0x6F, 0x2A, 0xCE, 0x44, 0x4F, 0x68, 0x49]),
+            o.reveal([0x6D, 0xD8, 0xCD, 0x96, 0xC4, 0x47, 0xBC, 0x5B, 0xF5, 0x3C, 0x3A, 0x81, 0x1C, 0x96, 0x10, 0xE5]),
+            o.reveal([0x2D, 0x85, 0x73, 0x55, 0x44, 0x9B, 0x4F, 0xC6, 0x8E, 0x6C, 0xBE, 0x69, 0x2A, 0x22, 0xCF, 0xA6]),
+        ]
+
+        for prefix in suspiciousClassPrefixes {
+            if NSClassFromString(prefix) != nil {
+                logger.warning("Instrumentation class detected: \(SecurityLogger.redact(prefix))")
+                return true
+            }
+        }
+#endif
+        return false
+    }
+
     private static func checkCodeIntegrity() -> Bool {
         guard let executablePath = Bundle.main.executablePath else { return false }
         

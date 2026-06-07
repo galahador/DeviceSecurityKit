@@ -15,7 +15,8 @@ public final class FridaDetector {
     private static let o = StringObfuscator.shared
     private static let cacheQueue = DispatchQueue(label: "com.devicesecuritykit.frida.cache", attributes: .concurrent)
     private static var _portCheckCache: (date: Date, result: Bool, processCount: Int)?
-    private static let portCheckCacheInterval: TimeInterval = 5
+
+    public static var portCheckCacheInterval: TimeInterval = 5
 
     public static let defaultPorts: [UInt16] = [27042, 27043, 27044, 27045, 1337]
 
@@ -101,11 +102,15 @@ public final class FridaDetector {
         let now = Date()
         let currentProcessCount = getProcessCount()
 
-        if let cached = cacheQueue.sync(execute: { _portCheckCache }),
-           now.timeIntervalSince(cached.date) < portCheckCacheInterval,
-           cached.processCount == currentProcessCount {
-            return cached.result
+        let cached: Bool? = cacheQueue.sync(flags: .barrier) {
+            if let entry = _portCheckCache,
+               now.timeIntervalSince(entry.date) < portCheckCacheInterval,
+               entry.processCount == currentProcessCount {
+                return entry.result
+            }
+            return nil
         }
+        if let cached { return cached }
 
         let result = performPortCheck(ports: ports)
         cacheQueue.sync(flags: .barrier) {

@@ -154,7 +154,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
 
     @discardableResult
     public func addCountermeasure(_ countermeasure: Countermeasure) -> Self {
-        if case .threat(let t) = countermeasure.trigger, t == .noThreat {
+        if case .threat(let t) = countermeasure.trigger, t.rawValue == "noThreat" {
             return self
         }
         stateQueue.sync(flags: .barrier) { _countermeasures.append(countermeasure) }
@@ -186,7 +186,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         return result
     }
 
-    public func isSecure() -> Bool {
+    public var isSecure: Bool {
         return performCheck().isSecure
     }
 

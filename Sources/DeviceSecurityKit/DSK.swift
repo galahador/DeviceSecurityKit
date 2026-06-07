@@ -21,6 +21,10 @@ public final class DSK: DSKClient, @unchecked Sendable {
 
     // MARK: - Configuration
 
+    public func currentConfiguration() -> DeviceSecurityConfiguration {
+        monitor.currentConfiguration()
+    }
+
     @discardableResult
     public func configure(_ configuration: DeviceSecurityConfiguration = .default) -> Self {
         monitor.configure(configuration)
@@ -154,7 +158,7 @@ public final class DSK: DSKClient, @unchecked Sendable {
     }
 
     public var isSecure: Bool {
-        return monitor.isSecure()
+        return monitor.isSecure
     }
 
     public var threatHistory: [ThreatEvent] {

@@ -13,8 +13,8 @@ public final class RepackagingDetector {
 
     private static let logger = SecurityLogger.security(subsystem: "RepackagingDetector")
 
-    private static let CSMAGIC_EMBEDDED_SIGNATURE: UInt32 = 0xFADE0CC0
-    private static let CSMAGIC_BLOBWRAPPER: UInt32 = 0xFADE0B01
+    private static let csMagicEmbeddedSignature: UInt32 = 0xFADE0CC0
+    private static let csMagicBlobWrapper: UInt32 = 0xFADE0B01
 
     private static let cachedLeafHash: String? = {
         extractLeafCertificateHashFromDisk()
@@ -63,12 +63,22 @@ public final class RepackagingDetector {
     private static func extractLeafCertificateHashFromDisk() -> String? {
         guard let path = Bundle.main.executablePath,
               let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe) else {
+            logger.debug("Repackaging: could not read executable binary")
             return nil
         }
 
-        guard let cs = findCodeSignature(in: data) else { return nil }
-        guard let cmsBytes = findCMSBlob(in: data, csOffset: cs.offset, csSize: cs.size) else { return nil }
-        guard let leafCertBytes = extractLeafCertificateFromCMS(cmsBytes) else { return nil }
+        guard let cs = findCodeSignature(in: data) else {
+            logger.debug("Repackaging: LC_CODE_SIGNATURE not found in Mach-O")
+            return nil
+        }
+        guard let cmsBytes = findCMSBlob(in: data, csOffset: cs.offset, csSize: cs.size) else {
+            logger.debug("Repackaging: CMS blob not found in code signature SuperBlob")
+            return nil
+        }
+        guard let leafCertBytes = extractLeafCertificateFromCMS(cmsBytes) else {
+            logger.debug("Repackaging: could not extract leaf certificate from CMS/DER envelope")
+            return nil
+        }
 
         return sha256Hex(leafCertBytes)
     }
@@ -136,7 +146,7 @@ public final class RepackagingDetector {
             guard csEnd <= rawBuffer.count, csOffset + 12 <= rawBuffer.count else { return nil }
 
             let magic = UInt32(bigEndian: rawBuffer.load(fromByteOffset: csOffset, as: UInt32.self))
-            guard magic == CSMAGIC_EMBEDDED_SIGNATURE else { return nil }
+            guard magic == csMagicEmbeddedSignature else { return nil }
 
             let count = UInt32(bigEndian: rawBuffer.load(fromByteOffset: csOffset + 8, as: UInt32.self))
 
@@ -151,7 +161,7 @@ public final class RepackagingDetector {
                 let blobMagic = UInt32(bigEndian: rawBuffer.load(fromByteOffset: blobAbs, as: UInt32.self))
                 let blobLength = Int(UInt32(bigEndian: rawBuffer.load(fromByteOffset: blobAbs + 4, as: UInt32.self)))
 
-                if blobMagic == CSMAGIC_BLOBWRAPPER {
+                if blobMagic == csMagicBlobWrapper {
                     let cmsStart = blobAbs + 8
                     let cmsEnd = blobAbs + blobLength
                     guard cmsEnd <= rawBuffer.count, cmsStart < cmsEnd,

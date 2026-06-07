@@ -25,7 +25,22 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
     case repackaged
     case screenshotTaken
     case dylibInjection
+
+    @available(*, deprecated, message: "Use an empty threats array instead of .noThreat")
     case noThreat
+
+    public static var allCases: [SecurityThreat] {
+        var cases: [SecurityThreat] = [
+            .jailbreak, .debugger, .emulator, .reverseEngineering, .appIntegrity,
+            .screenRecording, .hooked, .pinningBypassed, .vpnDetected, .proxyDetected,
+            .methodSwizzling, .fridaDetected, .attestationFailed, .dskTampered,
+            .repackaged, .screenshotTaken, .dylibInjection
+        ]
+        if let legacy = SecurityThreat(rawValue: "noThreat") {
+            cases.append(legacy)
+        }
+        return cases
+    }
 
     public var description: String {
         switch self {
@@ -65,6 +80,17 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             return "Unauthorized dynamic library injected into process"
         case .noThreat:
             return "App is Secure"
+        }
+    }
+
+    public var isPersistent: Bool {
+        switch self {
+        case .jailbreak, .debugger, .emulator, .reverseEngineering, .appIntegrity,
+             .hooked, .pinningBypassed, .methodSwizzling, .fridaDetected,
+             .attestationFailed, .dskTampered, .repackaged, .dylibInjection:
+            return true
+        case .screenRecording, .vpnDetected, .proxyDetected, .screenshotTaken, .noThreat:
+            return false
         }
     }
 
