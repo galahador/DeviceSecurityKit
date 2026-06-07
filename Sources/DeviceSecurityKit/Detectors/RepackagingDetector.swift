@@ -154,8 +154,9 @@ public final class RepackagingDetector {
                 if blobMagic == CSMAGIC_BLOBWRAPPER {
                     let cmsStart = blobAbs + 8
                     let cmsEnd = blobAbs + blobLength
-                    guard cmsEnd <= rawBuffer.count, cmsStart < cmsEnd else { return nil }
-                    return Data(bytes: rawBuffer.baseAddress!.advanced(by: cmsStart), count: cmsEnd - cmsStart)
+                    guard cmsEnd <= rawBuffer.count, cmsStart < cmsEnd,
+                          let base = rawBuffer.baseAddress else { return nil }
+                    return Data(bytes: base.advanced(by: cmsStart), count: cmsEnd - cmsStart)
                 }
             }
 

@@ -20,6 +20,7 @@ public protocol DSKClient: AnyObject {
     @discardableResult func onStatusChange(_ handler: @escaping (SecurityStatus) -> Void) -> Self
     @discardableResult func onThreatDetected(_ handler: @escaping (SecurityThreat) -> Void) -> Self
     @discardableResult func onThreatEvent(_ handler: @escaping (ThreatEvent) -> Void) -> Self
+    @discardableResult func threatCallbackThrottleInterval(_ interval: TimeInterval) -> Self
 
     // MARK: - Countermeasures
     @discardableResult func countermeasure(for threat: SecurityThreat, throttled: Bool, action: @escaping @Sendable (SecurityThreat) -> Void) -> Self
@@ -35,10 +36,24 @@ public protocol DSKClient: AnyObject {
 
     // MARK: - Accessors
     var status: SecurityStatus { get }
+
+    /// Runs all enabled detectors synchronously and returns the result.
+    ///
+    /// - Important: This method may take several seconds depending on enabled
+    ///   detectors and the configured `detectorTimeout`. **Do not call on the
+    ///   main thread** — use `performCheckAsync()` or dispatch to a background
+    ///   queue instead.
     @discardableResult func performCheck() -> SecurityResult
     var isSecure: Bool { get }
     var threatHistory: [ThreatEvent] { get }
     @discardableResult func threatHistoryMaxSize(_ size: Int) -> Self
     func clearThreatHistory()
     var currentMonitoringInterval: TimeInterval { get }
+
+    /// An `AsyncStream` that yields every new `ThreatEvent` as it is detected.
+    ///
+    /// Each access creates an independent stream. The stream ends when the
+    /// monitor is stopped or the consuming `Task` is cancelled.
+    @available(iOS 15.0, *)
+    var threatEvents: AsyncStream<ThreatEvent> { get }
 }

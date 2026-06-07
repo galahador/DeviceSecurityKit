@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum SecurityThreat: String, CaseIterable, Equatable, Sendable {
+public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
     case jailbreak
     case debugger
     case emulator
@@ -110,7 +110,7 @@ public enum SecurityThreat: String, CaseIterable, Equatable, Sendable {
     }
 }
 
-public enum ThreatSeverity: Int, Comparable, Sendable {
+public enum ThreatSeverity: Int, Codable, Comparable, Sendable {
     case normal = 0
     case low = 1
     case medium = 2
