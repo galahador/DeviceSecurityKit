@@ -77,7 +77,7 @@ https://github.com/galahador/DeviceSecurityKit.git
 3. Select:
 
 ```text
-from: "0.28.0"
+from: "0.27.0"
 ```
 
 4. Add Package
@@ -88,7 +88,7 @@ from: "0.28.0"
 dependencies: [
     .package(
         url: "https://github.com/galahador/DeviceSecurityKit.git",
-        from: "0.28.0"
+        from: "0.27.0"
     )
 ]
 ```
@@ -135,6 +135,60 @@ if result.isSecure {
 } else {
     print(result.threats)
 }
+```
+
+> `performCheck()` runs all enabled detectors synchronously and may take several seconds. Call it off the main thread, or use the async variant below.
+
+### Async API
+
+```swift
+let result = await DSK.shared.performCheckAsync()
+let secure = await DSK.shared.isSecureAsync()
+```
+
+#### App Attest
+
+```swift
+let attestation = try await DSK.shared.attest(challengeHash: serverChallenge)
+// Send `attestation` to your backend for verification
+```
+
+#### AsyncStream
+
+Subscribe to a live stream of threat events:
+
+```swift
+Task {
+    for await event in DSK.shared.threatEvents {
+        print("\(event.threat) at \(event.detectedAt)")
+        print("Evidence: \(event.evidence)")
+    }
+}
+```
+
+Multiple consumers can subscribe independently. The stream ends when `stop()` is called or the consuming `Task` is cancelled.
+
+### Threat History
+
+DSK keeps a ring buffer of recent `ThreatEvent`s so you can inspect detections after the fact:
+
+```swift
+let history = DSK.shared.threatHistory
+
+for event in history {
+    print("\(event.threat) — \(event.detectedAt)")
+}
+```
+
+Configure the buffer size (default: 100) and clear it:
+
+```swift
+DSK.shared
+    .threatHistoryMaxSize(200)
+    .start()
+
+// Later:
+DSK.shared.clearThreatHistory()
 ```
 
 ---
@@ -266,30 +320,64 @@ DSK.shared
     .start()
 ```
 
-Default:
+Default: `60 seconds`
 
-```text
-60 seconds
+### Adaptive Monitoring
+
+DSK uses exponential backoff to balance responsiveness with efficiency:
+
+- **Threat detected** — interval snaps to `minMonitoringInterval` for rapid re-checking.
+- **Consecutive clean cycles** — interval doubles each cycle: `base × 2^cleanCycles`, clamped to `[min, max]`.
+
+```swift
+DSK.shared
+    .monitoringInterval(60)        // base interval
+    .minMonitoringInterval(10)     // fastest re-check
+    .maxMonitoringInterval(600)    // slowest backoff
+    .start()
+```
+
+Query the current adaptive interval at any time:
+
+```swift
+let current = DSK.shared.currentMonitoringInterval
 ```
 
 ---
 
 ## 🎯 Countermeasures
 
+Countermeasures are automatic actions that fire when a threat is detected.
+
+### Any Threat
+
 ```swift
 DSK.shared
-    .countermeasure(
-        throttled: false
-    ) { threat in
-
-        Analytics.log(
-            "dsk_threat",
-            ["type": threat.rawValue]
-        )
+    .countermeasure(throttled: false) { threat in
+        Analytics.log("dsk_threat", ["type": threat.rawValue])
     }
 ```
 
-### Custom Countermeasure
+### Specific Threat
+
+```swift
+DSK.shared
+    .countermeasure(for: .jailbreak, throttled: true) { _ in
+        AuthManager.shared.clearTokens()
+    }
+```
+
+### Severity-Based
+
+```swift
+DSK.shared
+    .countermeasure(forMinimumSeverity: .critical, throttled: true) { threat in
+        KeychainManager.shared.wipe()
+        exit(0)
+    }
+```
+
+### Custom Countermeasure Object
 
 ```swift
 let cm = Countermeasure(
@@ -309,7 +397,7 @@ DSK.shared.removeCountermeasure(cm)
 DSK.shared.removeAllCountermeasures()
 ```
 
-> ⚠️ Throttled countermeasures execute once every 300 seconds per threat type.
+> Throttled countermeasures execute once every 300 seconds per threat type. Adjust with `.threatCallbackThrottleInterval(_:)`.
 
 ---
 

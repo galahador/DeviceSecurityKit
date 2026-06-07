@@ -75,6 +75,12 @@ public final class DSK: DSKClient, @unchecked Sendable {
         return self
     }
 
+    @discardableResult
+    public func threatCallbackThrottleInterval(_ interval: TimeInterval) -> Self {
+        monitor.threatCallbackThrottleInterval = interval
+        return self
+    }
+
     // MARK: - Countermeasures
     @discardableResult
     public func countermeasure(
@@ -136,6 +142,12 @@ public final class DSK: DSKClient, @unchecked Sendable {
         return monitor.status
     }
 
+    /// Runs all enabled detectors synchronously and returns the result.
+    ///
+    /// - Important: This method may take several seconds depending on enabled
+    ///   detectors and the configured `detectorTimeout`. **Do not call on the
+    ///   main thread** — use `performCheckAsync()` or dispatch to a background
+    ///   queue instead.
     @discardableResult
     public func performCheck() -> SecurityResult {
         return monitor.performCheck()
@@ -174,5 +186,12 @@ public final class DSK: DSKClient, @unchecked Sendable {
     @available(iOS 15.0, *)
     public func attest(challengeHash: Data) async throws -> Data {
         try await AttestationDetector.attest(challengeHash: challengeHash)
+    }
+
+    // MARK: - AsyncStream
+
+    @available(iOS 15.0, *)
+    public var threatEvents: AsyncStream<ThreatEvent> {
+        monitor.threatEvents
     }
 }

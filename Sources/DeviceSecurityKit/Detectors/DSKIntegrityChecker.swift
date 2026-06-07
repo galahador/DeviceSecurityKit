@@ -95,7 +95,19 @@ internal struct DSKIntegrityChecker {
         return false
     }
 
-    // FNV-1a 64-bit constants
+    // FNV-1a 64-bit hash constants.
+    //
+    // FNV-1a is a non-cryptographic hash chosen for speed and simplicity —
+    // it processes one byte at a time with no setup. The algorithm:
+    //
+    //   hash = offsetBasis (0xcbf29ce484222325)
+    //   for each byte:
+    //       hash ^= byte
+    //       hash *= prime (0x00000100000001B3)
+    //
+    // This is used to checksum DSK's own __TEXT,__text section at launch
+    // (baseline) and on subsequent checks. A mismatch indicates the
+    // executable code was patched at runtime (e.g. by a hooking framework).
     private static let fnvOffsetBasis: UInt64 = 0xcbf29ce484222325
     private static let fnvPrime: UInt64 = 0x00000100000001B3
 

@@ -241,11 +241,11 @@ internal extension SecurityLogger {
         return value
 #else
         guard !value.isEmpty else { return "<empty>" }
-        // FNV-1a 32-bit hash → 8 hex chars, enough to correlate without exposing the value
-        var hash: UInt32 = 0x811c9dc5
+        // FNV-1a 64-bit hash → 16 hex chars, low collision rate for log correlation
+        var hash: UInt64 = 0xcbf29ce484222325
         for byte in value.utf8 {
-            hash ^= UInt32(byte)
-            hash = hash &* 0x01000193
+            hash ^= UInt64(byte)
+            hash = hash &* 0x00000100000001B3
         }
         return "<redacted:\(String(hash, radix: 16))>"
 #endif

@@ -42,6 +42,24 @@ public final class EmulatorDetector {
         return result.isEmulator
     }
 
+    /// Runs all emulator detection heuristics and returns a scored result.
+    ///
+    /// Each heuristic contributes a weighted confidence score:
+    ///
+    /// | Check                        | Weight |
+    /// |------------------------------|--------|
+    /// | `simulatorPaths`             | 1.5    |
+    /// | `deviceModel`                | 1.5    |
+    /// | `systemProperties`           | 2.0    |
+    /// | `runtimeEnvironment`         | 0.8    |
+    /// | `processEnvironment`         | 1.2    |
+    /// | `hardwareIdentifierMismatch` | 2.0    |
+    /// | `deviceCheckUnsupported`     | 1.5    |
+    ///
+    /// **Max possible score**: 10.5. The reported `confidence` is
+    /// `sum / maxScore`, clamped to `[0, 1]`. A device is flagged as an
+    /// emulator only when **>= 2 independent checks** fire, reducing
+    /// false positives from single-signal noise.
     public static func detectEmulator() -> DetectionResult {
 
         if checkSimulatorEnvironment() {

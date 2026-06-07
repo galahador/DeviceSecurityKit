@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct ThreatEvent: Equatable, Sendable {
+public struct ThreatEvent: Hashable, Codable, Sendable {
     public let threat: SecurityThreat
     public let severity: ThreatSeverity
     public let detectedAt: Date

@@ -33,6 +33,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     private var _onThreatEvent: ((ThreatEvent) -> Void)?
     private var _screenRecordingProvider: ScreenRecordingProvider? = DefaultScreenRecordingProvider()
     private var _countermeasures: [Countermeasure] = []
+    private var _threatEventContinuations: [UUID: AsyncStream<ThreatEvent>.Continuation] = [:]
 
     // MARK: - Threat History (ring buffer, protected by stateQueue)
     private var _threatHistory: [ThreatEvent] = []
@@ -172,6 +173,12 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
 
     // MARK: - Check Methods
 
+    /// Runs all enabled detectors synchronously and returns the result.
+    ///
+    /// - Important: This method may take several seconds depending on enabled
+    ///   detectors and the configured `detectorTimeout`. **Do not call on the
+    ///   main thread** — use `performCheckAsync()` or dispatch to a background
+    ///   queue instead.
     public func performCheck() -> SecurityResult {
         let result = gatherThreats()
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
@@ -204,6 +211,22 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         await performCheckAsync().isSecure
     }
 
+    // MARK: - AsyncStream
+    @available(iOS 15.0, *)
+    public var threatEvents: AsyncStream<ThreatEvent> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            self.stateQueue.sync(flags: .barrier) {
+                self._threatEventContinuations[id] = continuation
+            }
+            continuation.onTermination = { [weak self] _ in
+                self?.stateQueue.sync(flags: .barrier) {
+                    _ = self?._threatEventContinuations.removeValue(forKey: id)
+                }
+            }
+        }
+    }
+
     // MARK: - Monitoring
 
     public func startMonitoring() {
@@ -234,10 +257,16 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             monitoringTimer?.cancel()
             monitoringTimer = nil
         }
-        stateQueue.sync(flags: .barrier) {
+        let continuationsToFinish: [AsyncStream<ThreatEvent>.Continuation] = stateQueue.sync(flags: .barrier) {
             isMonitoring = false
             _currentInterval = _baseInterval
             _consecutiveCleanCycles = 0
+            let c = Array(_threatEventContinuations.values)
+            _threatEventContinuations.removeAll()
+            return c
+        }
+        for continuation in continuationsToFinish {
+            continuation.finish()
         }
 #if !DEBUG
         DebuggerDetector.stopContinuousDenyAttach()
@@ -253,7 +282,17 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
         firePending(pending, evidence: result.evidence)
 
-        // Adapt interval based on threat presence
+        // Adaptive interval: exponential backoff when clean, snap-back on threat.
+        //
+        // When threats are detected the interval resets to `_minInterval` for
+        // rapid re-checking. On each consecutive clean cycle the interval
+        // doubles (capped at cycle 10 to avoid overflow):
+        //
+        //   interval = baseInterval × 2^(min(cleanCycles, 10))
+        //
+        // The result is clamped to [_minInterval, _maxInterval]. This balances
+        // responsiveness (fast re-check after a threat) with battery/CPU
+        // efficiency (long intervals when the device stays clean).
         let hasThreats = !result.threats.isEmpty
         let (interval, cycles) = stateQueue.sync(flags: .barrier) { () -> (TimeInterval, Int) in
             if hasThreats {
@@ -481,12 +520,17 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             )
         }
 
-        // Record into ring buffer
+        // Record into ring buffer and feed AsyncStream consumers
         if !events.isEmpty {
             stateQueue.sync(flags: .barrier) {
                 _threatHistory.append(contentsOf: events)
                 if _threatHistory.count > _threatHistoryMaxSize {
                     _threatHistory.removeFirst(_threatHistory.count - _threatHistoryMaxSize)
+                }
+                for event in events {
+                    for continuation in _threatEventContinuations.values {
+                        continuation.yield(event)
+                    }
                 }
             }
         }

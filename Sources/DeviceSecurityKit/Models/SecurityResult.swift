@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct SecurityResult: Equatable, Sendable {
+public struct SecurityResult: Equatable, Codable, Sendable {
     public let threats: [SecurityThreat]
     public let evidence: [SecurityThreat: [String]]
 
@@ -98,6 +98,19 @@ public struct SecurityResult: Equatable, Sendable {
     }
 
     // MARK: - Risk Score
+
+    /// Composite risk score in `[0.0, 1.0]` derived from active threats.
+    ///
+    /// The score has two components:
+    ///
+    /// 1. **Floor** — maps the single highest severity to a `0–0.7` range:
+    ///    `floor = maxSeverity / critical.rawValue × 0.7`
+    ///
+    /// 2. **Compound bonus** — rewards multiple threats via a log curve that
+    ///    grows slowly, preventing any combination from overshooting 1.0:
+    ///    `bonus = min(log₂(1 + totalWeight) / 15, 0.3)`
+    ///
+    /// The final score is `min(floor + bonus, 1.0)`.
     ///
     /// | Scenario                     | Approximate score |
     /// |------------------------------|-------------------|
@@ -144,7 +157,7 @@ public struct SecurityResult: Equatable, Sendable {
 
 // MARK: - Risk Level
 
-public enum RiskLevel: Int, Comparable, CustomStringConvertible {
+public enum RiskLevel: Int, Codable, Comparable, CustomStringConvertible {
     case none = 0
     case low = 1
     case medium = 2
