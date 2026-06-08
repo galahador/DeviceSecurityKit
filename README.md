@@ -42,7 +42,8 @@
 | 🔐 App Attest | Apple App Attest validation |
 | 📦 Anti-Repackaging | Signing certificate verification |
 | 🛡️ DSK Integrity | Runtime validation of DSK internals |
-| ⏱️ Monitoring | Continuous background security monitoring |
+| ⏱️ Monitoring | Continuous background security monitoring, BGTaskScheduler integration |
+| 🔄 Signature Updates | Ed25519-verified remote updates to detection lists |
 
 ---
 
@@ -191,6 +192,26 @@ DSK.shared
 DSK.shared.clearThreatHistory()
 ```
 
+### SwiftUI
+
+`DSKObservable` wraps `DSK` as an `ObservableObject`, publishing `status` and `threatHistory` for use directly in SwiftUI views:
+
+```swift
+struct ContentView: View {
+    @StateObject private var dsk = DSKObservable()
+
+    var body: some View {
+        VStack {
+            Text("Status: \(dsk.status.rawValue)")
+
+            List(dsk.threatHistory) { event in
+                Text("\(event.threat) — \(event.detectedAt)")
+            }
+        }
+    }
+}
+```
+
 ---
 
 ## 🚨 Responding To Threats
@@ -298,6 +319,26 @@ print(
 
 ---
 
+## 🔄 Signature Updates
+
+`SignatureUpdateManager` extends DSK's built-in detection lists (jailbreak paths, debugger process names, reverse-engineering libraries, etc.) with additional entries from a remotely-distributed, Ed25519-signed manifest. Detectors append these entries to their static lists, so you can react to newly-discovered jailbreak tools or hooking frameworks without shipping an app update.
+
+```swift
+SignatureUpdateManager.shared
+    .configure(publicKey: yourEd25519PublicKey)
+
+let manifest = try await SignatureUpdateManager.shared.update(
+    from: manifestURL
+)
+
+print(manifest.version)
+print(SignatureUpdateManager.shared.entries(for: .jailbreakPaths))
+```
+
+The manifest is a signed envelope (`payload` + `signature`); `update(from:)` verifies the signature against the configured public key before applying or caching it. An invalid signature throws `SignatureUpdateError.invalidSignature`, and calling `update(from:)` before `configure(publicKey:)` throws `.notConfigured`. The most recently verified manifest is cached on disk and reloaded automatically the next time `configure(publicKey:)` is called.
+
+---
+
 ## 🌐 VPN Allowlist
 
 ```swift
@@ -341,6 +382,30 @@ Query the current adaptive interval at any time:
 
 ```swift
 let current = DSK.shared.currentMonitoringInterval
+```
+
+### Background Monitoring (BGTaskScheduler)
+
+DSK can run a security check while the app is suspended, via `BGAppRefreshTask`:
+
+```swift
+let identifier = "com.example.app.dsk-refresh"
+
+DSK.shared
+    .registerBackgroundTask(identifier: identifier)
+
+DSK.shared.scheduleBackgroundCheck(identifier: identifier)
+```
+
+`registerBackgroundTask(identifier:)` should be called during app launch (before `applicationDidFinishLaunching` returns). Each run automatically reschedules the next check and calls `performCheckAsync()`.
+
+Add the identifier to your `Info.plist`:
+
+```xml
+<key>BGTaskSchedulerPermittedIdentifiers</key>
+<array>
+    <string>com.example.app.dsk-refresh</string>
+</array>
 ```
 
 ---
