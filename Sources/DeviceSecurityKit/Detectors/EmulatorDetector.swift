@@ -246,7 +246,7 @@ public final class EmulatorDetector {
     private static func checkSystemProperties() -> Bool {
 
         for envVar in EmulatorDetector.emulatorDetectorListOptions.suspiciousEnvVars {
-            if let value = getenv(envVar) {
+            if getenv(envVar) != nil {
                 logger.debug("Found simulator environment variable: \(SecurityLogger.redact(envVar))")
                 return true
             }
