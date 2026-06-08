@@ -237,11 +237,11 @@ public final class DebuggerDetector {
     private static func checkBreakpointDetection() -> Bool {
 #if !DEBUG
         let targets: [UnsafeRawPointer] = [
-            unsafeBitCast(checkBreakpointDetection as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(checkDebuggerWithSysctl as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(checkDebuggerWithPtrace as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(checkDebuggerWithGetppid as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(checkDebuggerEnvironment as () -> Bool, to: UnsafeRawPointer.self)
+            FunctionAddress.of(checkBreakpointDetection as () -> Bool),
+            FunctionAddress.of(checkDebuggerWithSysctl as () -> Bool),
+            FunctionAddress.of(checkDebuggerWithPtrace as () -> Bool),
+            FunctionAddress.of(checkDebuggerWithGetppid as () -> Bool),
+            FunctionAddress.of(checkDebuggerEnvironment as () -> Bool)
         ]
 
         let scanDepth = 64

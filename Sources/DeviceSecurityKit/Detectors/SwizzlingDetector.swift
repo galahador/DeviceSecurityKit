@@ -160,8 +160,12 @@ public final class SwizzlingDetector {
         guard let classList = objc_copyClassList(&classCount) else { return false }
         defer { free(UnsafeMutableRawPointer(classList)) }
 
+        // `objc_copyClassList` is imported as `AutoreleasingUnsafeMutablePointer<AnyObject.Type>`.
+        let classes = UnsafeRawPointer(classList)
+            .bindMemory(to: AnyClass.self, capacity: Int(classCount))
+
         for i in 0..<Int(classCount) {
-            let cls: AnyClass = classList[i]
+            let cls: AnyClass = classes[i]
 
             guard let classImageName = class_getImageName(cls) else { continue }
             let classImage = String(cString: classImageName)
@@ -195,7 +199,7 @@ public final class SwizzlingDetector {
     /// Verifies every record in DSK's own `__swift5_types` (type context
     private static func checkSwiftMetadataIntegrity() -> Bool {
 #if !targetEnvironment(simulator)
-        let selfPtr = unsafeBitCast(checkSwiftMetadataIntegrity as () -> Bool, to: UnsafeRawPointer.self)
+        let selfPtr = FunctionAddress.of(checkSwiftMetadataIntegrity as () -> Bool)
         var selfInfo = Dl_info()
         guard dladdr(selfPtr, &selfInfo) != 0, let selfImage = selfInfo.dli_fname else {
             return true
