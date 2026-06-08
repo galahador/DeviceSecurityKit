@@ -57,4 +57,8 @@ public protocol DSKClient: AnyObject {
     /// monitor is stopped or the consuming `Task` is cancelled.
     @available(iOS 15.0, *)
     var threatEvents: AsyncStream<ThreatEvent> { get }
+
+    /// A live stream of `SecurityStatus` changes.
+    @available(iOS 15.0, *)
+    var statusUpdates: AsyncStream<SecurityStatus> { get }
 }

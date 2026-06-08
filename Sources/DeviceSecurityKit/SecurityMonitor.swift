@@ -34,6 +34,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     private var _screenRecordingProvider: ScreenRecordingProvider? = DefaultScreenRecordingProvider()
     private var _countermeasures: [Countermeasure] = []
     private var _threatEventContinuations: [UUID: AsyncStream<ThreatEvent>.Continuation] = [:]
+    private var _statusContinuations: [UUID: AsyncStream<SecurityStatus>.Continuation] = [:]
 
     // MARK: - Threat History (ring buffer, protected by stateQueue)
     private var _threatHistory: [ThreatEvent] = []
@@ -227,6 +228,26 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         }
     }
 
+    /// A live stream of `SecurityStatus` changes.
+    ///
+    /// Unlike `onStatusChange`, which holds a single overwritable handler,
+    /// this stream supports multiple independent consumers — each call
+    /// returns its own `AsyncStream` fed from the same underlying updates.
+    @available(iOS 15.0, *)
+    public var statusUpdates: AsyncStream<SecurityStatus> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            self.stateQueue.sync(flags: .barrier) {
+                self._statusContinuations[id] = continuation
+            }
+            continuation.onTermination = { [weak self] _ in
+                self?.stateQueue.sync(flags: .barrier) {
+                    _ = self?._statusContinuations.removeValue(forKey: id)
+                }
+            }
+        }
+    }
+
     // MARK: - Monitoring
 
     public func startMonitoring() {
@@ -257,15 +278,23 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             monitoringTimer?.cancel()
             monitoringTimer = nil
         }
-        let continuationsToFinish: [AsyncStream<ThreatEvent>.Continuation] = stateQueue.sync(flags: .barrier) {
+        let (threatContinuationsToFinish, statusContinuationsToFinish): (
+            [AsyncStream<ThreatEvent>.Continuation],
+            [AsyncStream<SecurityStatus>.Continuation]
+        ) = stateQueue.sync(flags: .barrier) {
             isMonitoring = false
             _currentInterval = _baseInterval
             _consecutiveCleanCycles = 0
-            let c = Array(_threatEventContinuations.values)
+            let threatContinuations = Array(_threatEventContinuations.values)
+            let statusContinuations = Array(_statusContinuations.values)
             _threatEventContinuations.removeAll()
-            return c
+            _statusContinuations.removeAll()
+            return (threatContinuations, statusContinuations)
         }
-        for continuation in continuationsToFinish {
+        for continuation in threatContinuationsToFinish {
+            continuation.finish()
+        }
+        for continuation in statusContinuationsToFinish {
             continuation.finish()
         }
 #if !DEBUG
@@ -531,6 +560,14 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                     for continuation in _threatEventContinuations.values {
                         continuation.yield(event)
                     }
+                }
+            }
+        }
+
+        if let status = pending.statusChange {
+            stateQueue.sync(flags: .barrier) {
+                for continuation in _statusContinuations.values {
+                    continuation.yield(status)
                 }
             }
         }

@@ -173,7 +173,7 @@ public final class SwizzlingDetector {
         defer { free(UnsafeMutableRawPointer(classList)) }
 
         for i in 0..<Int(classCount) {
-            let cls = classList[i]
+            let cls: AnyClass = classList[i]
 
             guard let classImageName = class_getImageName(cls) else { continue }
             let classImage = String(cString: classImageName)

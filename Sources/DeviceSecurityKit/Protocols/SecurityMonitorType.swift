@@ -62,4 +62,7 @@ public protocol SecurityMonitorType {
 
     @available(iOS 15.0, *)
     var threatEvents: AsyncStream<ThreatEvent> { get }
+
+    @available(iOS 15.0, *)
+    var statusUpdates: AsyncStream<SecurityStatus> { get }
 }
