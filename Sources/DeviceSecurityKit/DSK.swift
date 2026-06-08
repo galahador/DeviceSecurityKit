@@ -198,4 +198,11 @@ public final class DSK: DSKClient, @unchecked Sendable {
     public var threatEvents: AsyncStream<ThreatEvent> {
         monitor.threatEvents
     }
+
+    /// A live stream of `SecurityStatus` changes.
+    /// Unlike `onStatusChange`, which holds a single overwritable handler,
+    @available(iOS 15.0, *)
+    public var statusUpdates: AsyncStream<SecurityStatus> {
+        monitor.statusUpdates
+    }
 }
