@@ -17,10 +17,8 @@ internal struct DSKIntegrityChecker {
     // MARK: - Public
 
     internal static func isDSKCompromised() -> Bool {
-        return checkCriticalIMPs() || checkTextSegmentChecksum()
+        return checkCriticalIMPs() || checkSectionChecksums()
     }
-
-    // MARK: - Check 1: Verify DSK's own critical functions haven't been redirected
 
     private static func checkCriticalIMPs() -> Bool {
 #if !targetEnvironment(simulator)
@@ -70,51 +68,62 @@ internal struct DSKIntegrityChecker {
         return false
     }
 
-    // MARK: - Check 2: Checksum DSK's own __TEXT segment (FNV-1a, full section)
+    /// Sections checksummed at launch and re-verified on each integrity check.
+    private static let monitoredSections: [(segment: String, section: String)] = [
+        ("__TEXT", "__text"),
+        ("__TEXT", "__cstring"),
+        ("__TEXT", "__const"),
+    ]
 
-    private static var _baselineChecksum: UInt64?
+    private static var _baselineChecksums: [String: UInt64] = [:]
 
     internal static func captureBaseline() {
 #if !targetEnvironment(simulator)
-        guard let checksum = computeTextChecksum() else { return }
-        checksumQueue.sync { _baselineChecksum = checksum }
+        var checksums: [String: UInt64] = [:]
+        for (segment, section) in monitoredSections {
+            if let checksum = computeSectionChecksum(segment: segment, section: section) {
+                checksums[sectionKey(segment, section)] = checksum
+            }
+        }
+        checksumQueue.sync { _baselineChecksums = checksums }
 #endif
     }
 
-    private static func checkTextSegmentChecksum() -> Bool {
+    private static func checkSectionChecksums() -> Bool {
 #if !targetEnvironment(simulator)
-        let baseline = checksumQueue.sync { _baselineChecksum }
-        guard let baseline else { return false }
-        guard let current = computeTextChecksum() else { return true }
+        let baselines = checksumQueue.sync { _baselineChecksums }
+        guard !baselines.isEmpty else { return false }
 
-        if current != baseline {
-            logger.warning("DSK integrity: __TEXT segment checksum mismatch — binary has been patched")
-            return true
+        for (segment, section) in monitoredSections {
+            let key = sectionKey(segment, section)
+            guard let baseline = baselines[key] else { continue }
+
+            guard let current = computeSectionChecksum(segment: segment, section: section) else {
+                logger.warning("DSK integrity: \(segment),\(section) section vanished — binary has been patched")
+                return true
+            }
+
+            if current != baseline {
+                logger.warning("DSK integrity: \(segment),\(section) section checksum mismatch — binary has been patched")
+                return true
+            }
         }
 #endif
         return false
     }
 
+    private static func sectionKey(_ segment: String, _ section: String) -> String {
+        "\(segment),\(section)"
+    }
+
     // FNV-1a 64-bit hash constants.
-    //
-    // FNV-1a is a non-cryptographic hash chosen for speed and simplicity —
-    // it processes one byte at a time with no setup. The algorithm:
-    //
-    //   hash = offsetBasis (0xcbf29ce484222325)
-    //   for each byte:
-    //       hash ^= byte
-    //       hash *= prime (0x00000100000001B3)
-    //
-    // This is used to checksum DSK's own __TEXT,__text section at launch
-    // (baseline) and on subsequent checks. A mismatch indicates the
-    // executable code was patched at runtime (e.g. by a hooking framework).
     private static let fnvOffsetBasis: UInt64 = 0xcbf29ce484222325
     private static let fnvPrime: UInt64 = 0x00000100000001B3
 
-    private static func computeTextChecksum() -> UInt64? {
+    private static func computeSectionChecksum(segment: String, section: String) -> UInt64? {
 #if !targetEnvironment(simulator)
         // Find the Mach-O header for DSK's image
-        let selfPtr = unsafeBitCast(computeTextChecksum as () -> UInt64?, to: UnsafeRawPointer.self)
+        let selfPtr = unsafeBitCast(computeSectionChecksum as (String, String) -> UInt64?, to: UnsafeRawPointer.self)
         var selfInfo = Dl_info()
         guard dladdr(selfPtr, &selfInfo) != 0, let selfImage = selfInfo.dli_fname else {
             return nil
@@ -136,10 +145,10 @@ internal struct DSKIntegrityChecker {
 
         let hdr64 = UnsafeRawPointer(hdr).assumingMemoryBound(to: mach_header_64.self)
         var size: UInt = 0
-        guard let section = getsectiondata(hdr64, "__TEXT", "__text", &size) else { return nil }
+        guard let sectionData = getsectiondata(hdr64, segment, section, &size) else { return nil }
         guard size > 0 else { return nil }
 
-        let ptr = UnsafeRawPointer(section)
+        let ptr = UnsafeRawPointer(sectionData)
         let totalSize = Int(size)
         let windowSize = min(4096, totalSize)
 

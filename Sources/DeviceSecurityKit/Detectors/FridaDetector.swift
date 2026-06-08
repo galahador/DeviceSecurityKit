@@ -24,6 +24,7 @@ public final class FridaDetector {
     public static func isFridaDetected(portScanEnabled: Bool = true, ports: [UInt16]? = nil) -> Bool {
         return checkLoadedLibraries()
             || checkFridaSymbols()
+            || checkGadgetArtifacts()
             || (portScanEnabled && checkFridaPort(ports: ports ?? defaultPorts))
     }
 
@@ -93,6 +94,59 @@ public final class FridaDetector {
             if dlsym(rtldDefault, symbol) != nil {
                 logger.warning("Frida symbol present in process memory")
                 return true
+            }
+        }
+        return false
+    }
+
+    // The generic "frida" marker in `checkLoadedLibraries` misses Gadget
+    private static func checkGadgetArtifacts() -> Bool {
+        return checkGadgetLoadedImages() || checkGadgetConfigArtifacts()
+    }
+
+    private static func checkGadgetLoadedImages() -> Bool {
+        let gadgetMarkers = [
+            o.reveal([0x75, 0x09, 0x1F, 0x37, 0x4A, 0xD5, 0xDA, 0xF7, 0x25, 0x0E, 0x64, 0x5F, 0x94]),                      // libgadget
+            o.reveal([0x81, 0x76, 0x1D, 0x6C, 0xDC, 0x04, 0xAB, 0xEA, 0xC5, 0xED, 0x72, 0x45, 0x8E, 0x91, 0x96, 0x9D]),    // frida-gadget
+            o.reveal([0x39, 0x99, 0xC1, 0x20, 0x47, 0x30, 0x10, 0x8E, 0x32, 0x1F, 0x45, 0xEC, 0x7E, 0xC5, 0x53]),          // fridagadget
+        ]
+
+        let count = _dyld_image_count()
+        for i in 0..<count {
+            guard let rawName = _dyld_get_image_name(i) else { continue }
+            let name = String(cString: rawName).lowercased()
+            for marker in gadgetMarkers {
+                if name.contains(marker) {
+                    logger.warning("Frida Gadget library detected in loaded images: \(SecurityLogger.redact(name))")
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private static func checkGadgetConfigArtifacts() -> Bool {
+        let configMarkers = [
+            o.reveal([0x59, 0x01, 0xF8, 0x70, 0xBE, 0x0A, 0xD7, 0x34, 0xCE, 0x05, 0x52, 0xD2, 0x8E, 0x57, 0xA1, 0xED, 0xE8]), // gadget.config
+            o.reveal([0x40, 0xB6, 0xAB, 0xA0, 0x10, 0x26, 0x81, 0xAB, 0x76, 0xFE, 0x42, 0x19, 0xA7, 0xB7]),                   // .config.so
+        ]
+
+        guard let resourcePath = Bundle.main.resourcePath else { return false }
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(atPath: resourcePath) else { return false }
+
+        let scanLimit = 2000
+        var scanned = 0
+        for case let item as String in enumerator {
+            scanned += 1
+            if scanned > scanLimit { break }
+
+            let lower = item.lowercased()
+            for marker in configMarkers {
+                if lower.contains(marker) {
+                    logger.warning("Frida Gadget config artifact detected in app bundle: \(SecurityLogger.redact(item))")
+                    return true
+                }
             }
         }
         return false

@@ -19,17 +19,12 @@ public final class SwizzlingDetector {
         return checkSystemMethodOrigins()
             || checkAppClassIntegrity()
             || checkKnownSwizzlingLibraries()
+            || checkSwiftMetadataIntegrity()
     }
 
     // MARK: - Check 1: Method IMP origin
 
     private static func checkSystemMethodOrigins() -> Bool {
-        let systemPrefixes = [
-            o.reveal([0xD2, 0x97, 0x19, 0x1B, 0xE7, 0x54, 0x79, 0x8F, 0x81, 0x47, 0x34, 0xF1, 0x7F]),
-            o.reveal([0xAF, 0x7D, 0xE6, 0x83, 0x89, 0x28, 0xFB, 0xF4, 0xB0, 0x0C, 0x5E, 0xCE, 0xE4, 0xCF, 0x82, 0xD8, 0xB0, 0x30, 0xC1, 0x39]),
-            o.reveal([0x85, 0xFD, 0xA6, 0x8E, 0x0C, 0x59, 0xE0, 0x4B, 0x7B, 0x22, 0xB4, 0xFA, 0xF4, 0x24, 0x35, 0xF0, 0x79, 0xBC, 0x7A]),
-        ]
-
         let instanceTargets: [(String, String)] = [
             (
                 o.reveal([0xE7, 0x77, 0x90, 0x81, 0x50, 0x1E, 0xEB, 0x37, 0x74, 0x84, 0x72, 0x78, 0x73, 0xB7, 0x0D, 0x72]),
@@ -109,7 +104,7 @@ public final class SwizzlingDetector {
             guard class_getInstanceMethod(cls, sel) != nil else { continue }
             guard let imp = class_getMethodImplementation(cls, sel) else { continue }
 
-            if impIsOutsideSystem(imp, systemPrefixes: systemPrefixes, label: "\(className).\(selName)") {
+            if impIsOutsideSystem(imp, label: "\(className).\(selName)") {
                 return true
             }
         }
@@ -128,7 +123,7 @@ public final class SwizzlingDetector {
             let sel = NSSelectorFromString(connSel)
             if class_getInstanceMethod(metaCls, sel) != nil,
                let imp = class_getMethodImplementation(metaCls, sel) {
-                if impIsOutsideSystem(imp, systemPrefixes: systemPrefixes, label: "+\(connClass).\(connSel)") {
+                if impIsOutsideSystem(imp, label: "+\(connClass).\(connSel)") {
                     return true
                 }
             }
@@ -139,7 +134,6 @@ public final class SwizzlingDetector {
 
     private static func impIsOutsideSystem(
         _ imp: IMP,
-        systemPrefixes: [String],
         label: String
     ) -> Bool {
         let ptr = unsafeBitCast(imp, to: UnsafeRawPointer.self)
@@ -149,7 +143,7 @@ public final class SwizzlingDetector {
             return true
         }
         let imagePath = String(cString: fname)
-        if !systemPrefixes.contains(where: { imagePath.hasPrefix($0) }) {
+        if !SystemImageValidator.shared.isSystemImage(imagePath) {
             logger.warning("Method swizzling detected: \(SecurityLogger.redact(label)) → \(SecurityLogger.redact(imagePath))")
             return true
         }
@@ -161,12 +155,6 @@ public final class SwizzlingDetector {
     private static func checkAppClassIntegrity() -> Bool {
 #if !targetEnvironment(simulator)
         guard let appImagePath = Bundle.main.executablePath else { return false }
-        
-        let systemPrefixes = [
-            o.reveal([0xD2, 0x97, 0x19, 0x1B, 0xE7, 0x54, 0x79, 0x8F, 0x81, 0x47, 0x34, 0xF1, 0x7F]),
-            o.reveal([0xAF, 0x7D, 0xE6, 0x83, 0x89, 0x28, 0xFB, 0xF4, 0xB0, 0x0C, 0x5E, 0xCE, 0xE4, 0xCF, 0x82, 0xD8, 0xB0, 0x30, 0xC1, 0x39]),
-            o.reveal([0x85, 0xFD, 0xA6, 0x8E, 0x0C, 0x59, 0xE0, 0x4B, 0x7B, 0x22, 0xB4, 0xFA, 0xF4, 0x24, 0x35, 0xF0, 0x79, 0xBC, 0x7A]),
-        ]
 
         var classCount: UInt32 = 0
         guard let classList = objc_copyClassList(&classCount) else { return false }
@@ -192,7 +180,7 @@ public final class SwizzlingDetector {
                 let impImage = String(cString: fname)
 
                 if impImage != appImagePath &&
-                   !systemPrefixes.contains(where: { impImage.hasPrefix($0) }) {
+                   !SystemImageValidator.shared.isSystemImage(impImage) {
                     let sel = method_getName(methods[j])
                     let className = NSStringFromClass(cls)
                     let selName = NSStringFromSelector(sel)
@@ -204,8 +192,76 @@ public final class SwizzlingDetector {
 #endif
         return false
     }
+    /// Verifies every record in DSK's own `__swift5_types` (type context
+    private static func checkSwiftMetadataIntegrity() -> Bool {
+#if !targetEnvironment(simulator)
+        let selfPtr = unsafeBitCast(checkSwiftMetadataIntegrity as () -> Bool, to: UnsafeRawPointer.self)
+        var selfInfo = Dl_info()
+        guard dladdr(selfPtr, &selfInfo) != 0, let selfImage = selfInfo.dli_fname else {
+            return true
+        }
+        let dskImagePath = String(cString: selfImage)
 
-    // MARK: - Check 3: Known swizzling libraries
+        let imageCount = _dyld_image_count()
+        var header: UnsafePointer<mach_header>?
+        for i in 0..<imageCount {
+            guard let name = _dyld_get_image_name(i) else { continue }
+            if String(cString: name) == dskImagePath {
+                header = _dyld_get_image_header(i)
+                break
+            }
+        }
+        guard let hdr = header else { return false }
+        let hdr64 = UnsafeRawPointer(hdr).assumingMemoryBound(to: mach_header_64.self)
+
+        let metadataSections: [(segment: String, section: String)] = [
+            ("__TEXT", "__swift5_types"),
+            ("__TEXT", "__swift5_proto"),
+        ]
+
+        for (segment, section) in metadataSections {
+            if sectionRecordsEscapeImage(hdr64: hdr64, segment: segment, section: section, dskImagePath: dskImagePath) {
+                logger.warning("DSK integrity: Swift metadata record in \(segment),\(section) resolves outside DSK's own image")
+                return true
+            }
+        }
+#endif
+        return false
+    }
+
+    /// Walks an array of 32-bit relative direct pointers (the encoding used by
+    private static func sectionRecordsEscapeImage(
+        hdr64: UnsafePointer<mach_header_64>,
+        segment: String,
+        section: String,
+        dskImagePath: String
+    ) -> Bool {
+        var size: UInt = 0
+        guard let sectionData = getsectiondata(hdr64, segment, section, &size), size > 0 else { return false }
+
+        let stride = MemoryLayout<Int32>.size
+        let recordCount = min(Int(size) / stride, 5000)
+        let base = UnsafeRawPointer(sectionData)
+
+        for i in 0..<recordCount {
+            let byteOffset = i * stride
+            let relativeOffset = base.load(fromByteOffset: byteOffset, as: Int32.self)
+            guard relativeOffset != 0 else { continue }
+
+            let recordAddress = base.advanced(by: byteOffset)
+            let targetAddress = recordAddress.advanced(by: Int(relativeOffset))
+
+            var info = Dl_info()
+            guard dladdr(targetAddress, &info) != 0, let fname = info.dli_fname else { return true }
+
+            if String(cString: fname) != dskImagePath {
+                return true
+            }
+        }
+        return false
+    }
+
+    // MARK: - Check 4: Known swizzling libraries
 
     private static func checkKnownSwizzlingLibraries() -> Bool {
         let suspiciousLibraries = [
