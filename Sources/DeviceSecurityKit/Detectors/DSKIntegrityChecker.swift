@@ -23,7 +23,7 @@ internal struct DSKIntegrityChecker {
     private static func checkCriticalIMPs() -> Bool {
 #if !targetEnvironment(simulator)
         // Get the image path for DSK, use this file's own function as anchor
-        let selfPtr = unsafeBitCast(checkCriticalIMPs as () -> Bool, to: UnsafeRawPointer.self)
+        let selfPtr = FunctionAddress.of(checkCriticalIMPs as () -> Bool)
         var selfInfo = Dl_info()
         guard dladdr(selfPtr, &selfInfo) != 0, let selfImage = selfInfo.dli_fname else {
             logger.warning("DSK integrity: cannot resolve own image — assuming compromised")
@@ -33,22 +33,22 @@ internal struct DSKIntegrityChecker {
 
         // Resolve key detector entry points and verify they live in the same image as DSK
         let criticalFunctions: [UnsafeRawPointer] = [
-            unsafeBitCast(JailbreakDetector.isJailbroken as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(DebuggerDetector.isDebuggerAttached as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(FridaDetector.isFridaDetected as (Bool, [UInt16]?) -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(HookDetector.isFunctionHooked as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(SwizzlingDetector.isSwizzled as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(CertificatePinningDetector.isPinningBypassed as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(ReverseEngineeringDetector.isReverseEngineered as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(EmulatorDetector.isEmulator as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(AttestationDetector.isAttestationFailed as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(AppIntegrityDetector.isIntegrityCompromised as (String?) -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(VPNProxyDetector.isVPNActive as ([String]) -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(VPNProxyDetector.isProxyActive as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(RepackagingDetector.isRepackaged as (String?) -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(DylibInjectionDetector.isDylibInjected as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(ScreenshotDetector.wasScreenshotTaken as () -> Bool, to: UnsafeRawPointer.self),
-            unsafeBitCast(ProxyConfigurationChecker.isProxyConfigured as () -> Bool, to: UnsafeRawPointer.self),
+            FunctionAddress.of(JailbreakDetector.isJailbroken as () -> Bool),
+            FunctionAddress.of(DebuggerDetector.isDebuggerAttached as () -> Bool),
+            FunctionAddress.of(FridaDetector.isFridaDetected as (Bool, [UInt16]?) -> Bool),
+            FunctionAddress.of(HookDetector.isFunctionHooked as () -> Bool),
+            FunctionAddress.of(SwizzlingDetector.isSwizzled as () -> Bool),
+            FunctionAddress.of(CertificatePinningDetector.isPinningBypassed as () -> Bool),
+            FunctionAddress.of(ReverseEngineeringDetector.isReverseEngineered as () -> Bool),
+            FunctionAddress.of(EmulatorDetector.isEmulator as () -> Bool),
+            FunctionAddress.of(AttestationDetector.isAttestationFailed as () -> Bool),
+            FunctionAddress.of(AppIntegrityDetector.isIntegrityCompromised as (String?) -> Bool),
+            FunctionAddress.of(VPNProxyDetector.isVPNActive as ([String]) -> Bool),
+            FunctionAddress.of(VPNProxyDetector.isProxyActive as () -> Bool),
+            FunctionAddress.of(RepackagingDetector.isRepackaged as (String?) -> Bool),
+            FunctionAddress.of(DylibInjectionDetector.isDylibInjected as () -> Bool),
+            FunctionAddress.of(ScreenshotDetector.wasScreenshotTaken as () -> Bool),
+            FunctionAddress.of(ProxyConfigurationChecker.isProxyConfigured as () -> Bool),
         ]
 
         for funcPtr in criticalFunctions {
@@ -123,7 +123,7 @@ internal struct DSKIntegrityChecker {
     private static func computeSectionChecksum(segment: String, section: String) -> UInt64? {
 #if !targetEnvironment(simulator)
         // Find the Mach-O header for DSK's image
-        let selfPtr = unsafeBitCast(computeSectionChecksum as (String, String) -> UInt64?, to: UnsafeRawPointer.self)
+        let selfPtr = FunctionAddress.of(computeSectionChecksum as (String, String) -> UInt64?)
         var selfInfo = Dl_info()
         guard dladdr(selfPtr, &selfInfo) != 0, let selfImage = selfInfo.dli_fname else {
             return nil
