@@ -145,12 +145,6 @@ public final class HookDetector {
             o.reveal([0x3A, 0xD1, 0x6E, 0x35, 0x0F, 0x33, 0xC2, 0xCE, 0xE3, 0x41, 0x29]),
         ]
 
-        let systemPrefixes = [
-            o.reveal([0xA9, 0xBE, 0x53, 0x9D, 0xDE, 0x11, 0x60, 0x66, 0xDC, 0x8A, 0x87, 0xDC, 0xEC]),
-            o.reveal([0x62, 0x2E, 0x26, 0x13, 0x48, 0x9F, 0xA6, 0xE7, 0x29, 0xAB, 0x7D, 0xD1, 0x63, 0x9D, 0x63, 0x58, 0xBB, 0x06, 0x9C, 0x39]),
-            o.reveal([0x28, 0x24, 0x55, 0xF6, 0x2D, 0xFB, 0x67, 0xF1, 0x82, 0x24, 0xAF, 0x48, 0x6F, 0x99, 0x76, 0x40, 0x75, 0x29, 0x95])
-        ]
-
         guard let handle = dlopen(nil, RTLD_NOW) else { return false }
         defer { dlclose(handle) }
 
@@ -164,7 +158,7 @@ public final class HookDetector {
             }
 
             let imagePath = String(cString: fname)
-            if !systemPrefixes.contains(where: { imagePath.hasPrefix($0) }) {
+            if !SystemImageValidator.shared.isSystemImage(imagePath) {
                 logger.warning("Hook detected: function redirected to non-system image: \(SecurityLogger.redact(imagePath))")
                 return true
             }
@@ -190,6 +184,8 @@ public final class HookDetector {
             o.reveal([0xDC, 0xC4, 0x8E, 0x35, 0xBC, 0x6D, 0x95, 0x08, 0xDC, 0xE3, 0x5C]),
         ]
 
+        let scanWindow = 16
+
         for name in targets {
             guard let sym = dlsym(handle, name) else { continue }
 
@@ -207,6 +203,16 @@ public final class HookDetector {
             if (first & 0xFC000000) == 0x14000000 {
                 logger.warning("Suspicious unconditional branch at start of: \(SecurityLogger.redact(name))")
                 return true
+            }
+
+            // Same trampoline pair, spliced deeper into the function body
+            for offset in 1..<scanWindow {
+                let a = instructions.advanced(by: offset).pointee
+                let b = instructions.advanced(by: offset + 1).pointee
+                if a == 0x58000050 && b == 0xD61F0200 {
+                    logger.warning("Inline hook trampoline spliced mid-function in: \(SecurityLogger.redact(name)) (instruction offset \(offset))")
+                    return true
+                }
             }
         }
 #endif

@@ -19,7 +19,8 @@ let package = Package(
             path: "Sources",
             linkerSettings: [
                 .linkedFramework("NetworkExtension"),
-                .linkedFramework("DeviceCheck")
+                .linkedFramework("DeviceCheck"),
+                .linkedFramework("BackgroundTasks")
             ]
         ),
         .testTarget(
