@@ -10,6 +10,12 @@ import XCTest
 
 final class SwizzlingDetectorTests: XCTestCase {
 
+    // MARK: - Detector
+
+    func testIsSwizzled_cleanEnvironment_returnsFalse() {
+        XCTAssertFalse(SwizzlingDetector.isSwizzled())
+    }
+
     func testNoThreat_whenCheckDisabled() {
         let monitor = SecurityMonitor(configuration: .disabled.withSwizzlingDetection(false))
         let result = monitor.performCheck()

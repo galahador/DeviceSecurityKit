@@ -56,7 +56,7 @@ public final class CertificatePinningDetector {
             }
 
             let imagePath = String(cString: fname)
-            if !imagePath.hasPrefix(expectedPrefix) {
+            if !SystemImageValidator.shared.normalizedImagePath(imagePath).hasPrefix(expectedPrefix) {
                 logger.warning("Pinning bypass: \(SecurityLogger.redact(name)) redirected to: \(SecurityLogger.redact(imagePath))")
                 return true
             }
