@@ -24,6 +24,15 @@ internal struct SystemImageValidator {
     }
 
     internal func isSystemImage(_ path: String) -> Bool {
-        systemPrefixes.contains { path.hasPrefix($0) }
+        systemPrefixes.contains { normalizedImagePath(path).hasPrefix($0) }
+    }
+
+    internal func normalizedImagePath(_ path: String) -> String {
+#if targetEnvironment(simulator)
+        if let range = path.range(of: "/RuntimeRoot") {
+            return String(path[range.upperBound...])
+        }
+#endif
+        return path
     }
 }
