@@ -164,21 +164,20 @@ public final class DylibInjectionDetector {
             let cmd = cmdPtr.load(as: UInt32.self)
             let cmdsize = cmdPtr.load(fromByteOffset: 4, as: UInt32.self)
             guard cmdsize >= 12 else { break }
+            defer { cmdPtr = cmdPtr.advanced(by: Int(cmdsize)) }
 
-            if cmd == LC_LOAD_DYLIB || cmd == LC_LOAD_WEAK_DYLIB || cmd == LC_REEXPORT_DYLIB || cmd == LC_LAZY_LOAD_DYLIB {
-                // dylib_command: cmd(4) + cmdsize(4) + name_offset(4) + timestamp(4) + versions(8)
-                let nameOffset = Int(cmdPtr.load(fromByteOffset: 8, as: UInt32.self))
-                guard nameOffset >= 12, nameOffset < Int(cmdsize) else { break }
-                let namePtr = cmdPtr.advanced(by: nameOffset).assumingMemoryBound(to: CChar.self)
-                let dylibPath = String(cString: namePtr)
+            guard cmd == LC_LOAD_DYLIB || cmd == LC_LOAD_WEAK_DYLIB || cmd == LC_REEXPORT_DYLIB || cmd == LC_LAZY_LOAD_DYLIB else { continue }
 
-                if !isExpectedDylibPath(dylibPath) {
-                    logger.warning("Dylib injection: unexpected LC_LOAD_DYLIB: \(SecurityLogger.redact(dylibPath))")
-                    return true
-                }
+            // dylib_command: cmd(4) + cmdsize(4) + name_offset(4) + timestamp(4) + versions(8)
+            let nameOffset = Int(cmdPtr.load(fromByteOffset: 8, as: UInt32.self))
+            guard nameOffset >= 12, nameOffset < Int(cmdsize) else { continue }
+            let namePtr = cmdPtr.advanced(by: nameOffset).assumingMemoryBound(to: CChar.self)
+            let dylibPath = String(cString: namePtr)
+
+            if !isExpectedDylibPath(dylibPath) {
+                logger.warning("Dylib injection: unexpected LC_LOAD_DYLIB: \(SecurityLogger.redact(dylibPath))")
+                return true
             }
-
-            cmdPtr = cmdPtr.advanced(by: Int(cmdsize))
         }
 
         return false

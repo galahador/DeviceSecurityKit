@@ -116,6 +116,7 @@ public final class AppIntegrityDetector {
                 guard offset + MemoryLayout<load_command>.size <= rawBuffer.count else { break }
 
                 let cmd = rawBuffer.load(fromByteOffset: offset, as: load_command.self)
+                guard cmd.cmdsize >= UInt32(MemoryLayout<load_command>.size) else { break }
 
                 if cmd.cmd == LC_CODE_SIGNATURE {
                     return false // signature found not compromised
