@@ -65,6 +65,9 @@ public final class JailbreakDetector {
     // MARK: - Evidence Collectors
 
     private static func collectFileEvidence() -> [String] {
+#if targetEnvironment(simulator)
+        return []
+#else
         var found: [String] = []
         for path in jailbreakListOptions.suspiciousPaths {
             if FileManager.default.fileExists(atPath: path) || FileManager.default.isReadableFile(atPath: path) {
@@ -72,6 +75,7 @@ public final class JailbreakDetector {
             }
         }
         return found
+#endif
     }
 
     private static func collectURLSchemeEvidence() -> [String] {
@@ -125,17 +129,21 @@ public final class JailbreakDetector {
     // MARK: - Private Detection Methods
     
     private static func checkJailbreakFiles() -> Bool {
+#if targetEnvironment(simulator)
+        return false
+#else
         for path in jailbreakListOptions.suspiciousPaths {
             if FileManager.default.fileExists(atPath: path) {
                 return true
             }
-            
+
             if FileManager.default.isReadableFile(atPath: path) {
                 return true
             }
         }
-        
+
         return false
+#endif
     }
     
     private static func checkSandboxIntegrity() -> Bool {
