@@ -145,4 +145,22 @@ final class SecurityMonitorTests: XCTestCase {
         monitor.threatCallbackThrottleInterval = 120.0
         XCTAssertEqual(monitor.threatCallbackThrottleInterval, 120.0)
     }
+
+    // MARK: - Detector Diagnostics
+
+    func testLastDetectorDiagnostics_initiallyEmpty() {
+        let monitor = SecurityMonitor(configuration: .disabled)
+        XCTAssertTrue(monitor.lastDetectorDiagnostics.isEmpty)
+    }
+
+    func testLastDetectorDiagnostics_populatedAfterPerformCheck() {
+        let monitor = SecurityMonitor(configuration: .jailbreakOnly)
+        _ = monitor.performCheck()
+        let diagnostics = monitor.lastDetectorDiagnostics
+        XCTAssertNotNil(diagnostics["jailbreak"])
+        XCTAssertGreaterThanOrEqual(diagnostics["jailbreak"]?.duration ?? -1, 0)
+        XCTAssertEqual(diagnostics["jailbreak"]?.timedOut, false)
+        // dskTampered always runs regardless of configuration
+        XCTAssertNotNil(diagnostics["dskTampered"])
+    }
 }

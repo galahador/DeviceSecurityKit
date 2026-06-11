@@ -136,7 +136,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
     }
 }
 
-public enum ThreatSeverity: Int, Codable, Comparable, Sendable {
+public enum ThreatSeverity: Int, Codable, Comparable, Sendable, CustomStringConvertible {
     case normal = 0
     case low = 1
     case medium = 2
@@ -145,5 +145,15 @@ public enum ThreatSeverity: Int, Codable, Comparable, Sendable {
     
     public static func < (lhs: ThreatSeverity, rhs: ThreatSeverity) -> Bool {
         return lhs.rawValue < rhs.rawValue
+    }
+
+    public var description: String {
+        switch self {
+        case .normal:   return "Normal"
+        case .low:      return "Low"
+        case .medium:   return "Medium"
+        case .high:     return "High"
+        case .critical: return "Critical"
+        }
     }
 }

@@ -54,4 +54,36 @@ final class SecurityResultTests: XCTestCase {
         XCTAssertEqual(a, b)
         XCTAssertNotEqual(a, c)
     }
+
+    // MARK: - generateReport
+
+    func testGenerateReport_secure() {
+        let report = SecurityResult.secure.generateReport()
+        XCTAssertTrue(report.contains("Status: Secure"))
+        XCTAssertTrue(report.contains("Threats Detected: 0"))
+        XCTAssertTrue(report.contains("No threats detected."))
+    }
+
+    func testGenerateReport_includesThreatsAndEvidence() {
+        let result = SecurityResult(
+            threats: [.jailbreak, .debugger],
+            evidence: [
+                .jailbreak: ["suspiciousPath(\"/Applications/Cydia.app\")"],
+                .debugger: ["ptraceDetected"]
+            ]
+        )
+        let report = result.generateReport()
+        XCTAssertTrue(report.contains("Status: Compromised"))
+        XCTAssertTrue(report.contains("Threats Detected: 2"))
+        XCTAssertTrue(report.contains("jailbreak"))
+        XCTAssertTrue(report.contains("debugger"))
+        XCTAssertTrue(report.contains("suspiciousPath(\"/Applications/Cydia.app\")"))
+        XCTAssertTrue(report.contains("ptraceDetected"))
+        // Highest severity threat should be listed first, I hope...
+        let jailbreakRange = report.range(of: "jailbreak")
+        let debuggerRange = report.range(of: "debugger")
+        XCTAssertNotNil(jailbreakRange)
+        XCTAssertNotNil(debuggerRange)
+        XCTAssertTrue(jailbreakRange!.lowerBound < debuggerRange!.lowerBound)
+    }
 }

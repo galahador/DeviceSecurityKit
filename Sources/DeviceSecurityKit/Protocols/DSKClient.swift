@@ -39,11 +39,6 @@ public protocol DSKClient: AnyObject {
     var status: SecurityStatus { get }
 
     /// Runs all enabled detectors synchronously and returns the result.
-    ///
-    /// - Important: This method may take several seconds depending on enabled
-    ///   detectors and the configured `detectorTimeout`. **Do not call on the
-    ///   main thread** — use `performCheckAsync()` or dispatch to a background
-    ///   queue instead.
     @discardableResult func performCheck() -> SecurityResult
     var isSecure: Bool { get }
     var threatHistory: [ThreatEvent] { get }
@@ -51,14 +46,12 @@ public protocol DSKClient: AnyObject {
     func clearThreatHistory()
     var currentMonitoringInterval: TimeInterval { get }
 
-    /// An `AsyncStream` that yields every new `ThreatEvent` as it is detected.
-    ///
-    /// Each access creates an independent stream. The stream ends when the
-    /// monitor is stopped or the consuming `Task` is cancelled.
+    /// Timing and timeout information for each detector from the most recent performCheck()
+    var lastDetectorDiagnostics: [String: DetectorDiagnostic] { get }
+
     @available(iOS 15.0, *)
     var threatEvents: AsyncStream<ThreatEvent> { get }
 
-    /// A live stream of `SecurityStatus` changes.
     @available(iOS 15.0, *)
     var statusUpdates: AsyncStream<SecurityStatus> { get }
 }

@@ -57,4 +57,19 @@ final class JailbreakDetectorTests: XCTestCase {
         XCTAssertFalse(result.isJailbroken, "Simulator should not report jailbreak")
         #endif
     }
+
+    // MARK: - TrollStore Detection Lists
+
+    func testJailbreakListOptions_includesTrollStorePaths() {
+        let options = JailbreakListOptions()
+        XCTAssertTrue(options.suspiciousPaths.contains("/Applications/TrollStore.app"))
+        XCTAssertTrue(options.suspiciousPaths.contains("/Applications/TrollStore.app/Info.plist"))
+        XCTAssertTrue(options.suspiciousPaths.contains("/Applications/TrollStore.app/TrollStore"))
+        XCTAssertTrue(options.suspiciousPaths.contains("/var/containers/Bundle/Application/.TrollStorePersistenceHelper"))
+    }
+
+    func testJailbreakListOptions_includesTrollStoreURLScheme() {
+        let options = JailbreakListOptions()
+        XCTAssertTrue(options.urlSchemes.contains("apple-magnifier://"))
+    }
 }
