@@ -60,9 +60,10 @@ public final class DebuggerDetector {
             ("environment", checkDebuggerEnvironment()),
             ("timing", checkTimingAnalysis()),
             ("breakpoint", checkBreakpointDetection()),
-            ("textIntegrity", checkTextSegmentIntegrity())
+            ("textIntegrity", checkTextSegmentIntegrity()),
+            ("exceptionPorts", checkExceptionPorts())
         ]
-        
+
 #if DEBUG
         for (method, detected) in detectionResults {
             if detected {
@@ -88,7 +89,8 @@ public final class DebuggerDetector {
             "environment": checkDebuggerEnvironment(),
             "timing": checkTimingAnalysis(),
             "breakpoint": checkBreakpointDetection(),
-            "textIntegrity": checkTextSegmentIntegrity()
+            "textIntegrity": checkTextSegmentIntegrity(),
+            "exceptionPorts": checkExceptionPorts()
         ]
     }
     
@@ -307,6 +309,50 @@ public final class DebuggerDetector {
         if sum1 != sum2 {
             logger.info("Text segment integrity check failed — possible breakpoint insertion")
             return true
+        }
+
+        return false
+#else
+        return false
+#endif
+    }
+
+    // MARK: - Exception Port Hijack Check
+
+    private static func checkExceptionPorts() -> Bool {
+#if !DEBUG
+        let exceptionMask = exception_mask_t(
+            EXC_MASK_BAD_ACCESS | EXC_MASK_BAD_INSTRUCTION | EXC_MASK_ARITHMETIC |
+            EXC_MASK_SOFTWARE | EXC_MASK_BREAKPOINT
+        )
+
+        let portCount = Int(EXC_TYPES_COUNT)
+        var masks = [exception_mask_t](repeating: 0, count: portCount)
+        var ports = [mach_port_t](repeating: 0, count: portCount)
+        var behaviors = [exception_behavior_t](repeating: 0, count: portCount)
+        var flavors = [thread_state_flavor_t](repeating: 0, count: portCount)
+        var maskCount = mach_msg_type_number_t(portCount)
+
+        let result = task_get_exception_ports(
+            mach_task_self_,
+            exceptionMask,
+            &masks,
+            &maskCount,
+            &ports,
+            &behaviors,
+            &flavors
+        )
+
+        guard result == KERN_SUCCESS else {
+            logger.error("task_get_exception_ports failed with result: \(result)")
+            return false
+        }
+
+        for i in 0..<Int(maskCount) {
+            if ports[i] != mach_port_t(MACH_PORT_NULL) {
+                logger.info("Custom exception port handler detected at index \(i)")
+                return true
+            }
         }
 
         return false
