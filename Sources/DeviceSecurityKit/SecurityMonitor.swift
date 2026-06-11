@@ -182,11 +182,6 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     // MARK: - Check Methods
 
     /// Runs all enabled detectors synchronously and returns the result.
-    ///
-    /// - Important: This method may take several seconds depending on enabled
-    ///   detectors and the configured `detectorTimeout`. **Do not call on the
-    ///   main thread** — use `performCheckAsync()` or dispatch to a background
-    ///   queue instead.
     public func performCheck() -> SecurityResult {
         let result = gatherThreats()
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
