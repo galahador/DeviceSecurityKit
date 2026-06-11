@@ -54,6 +54,9 @@ public protocol SecurityMonitorType {
     var threatHistoryMaxSize: Int { get set }
     func clearThreatHistory()
 
+    /// Timing and timeout information for each detector from the most recent performCheck()
+    var lastDetectorDiagnostics: [String: DetectorDiagnostic] { get }
+
     // MARK: - Async
     @available(iOS 15.0, *)
     func performCheckAsync() async -> SecurityResult

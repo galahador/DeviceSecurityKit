@@ -112,25 +112,6 @@ public struct SecurityResult: Equatable, Codable, Sendable {
     // MARK: - Risk Score
 
     /// Composite risk score in `[0.0, 1.0]` derived from active threats.
-    ///
-    /// The score has two components:
-    ///
-    /// 1. **Floor** — maps the single highest severity to a `0–0.7` range:
-    ///    `floor = maxSeverity / critical.rawValue × 0.7`
-    ///
-    /// 2. **Compound bonus** — rewards multiple threats via a log curve that
-    ///    grows slowly, preventing any combination from overshooting 1.0:
-    ///    `bonus = min(log₂(1 + totalWeight) / 15, 0.3)`
-    ///
-    /// The final score is `min(floor + bonus, 1.0)`.
-    ///
-    /// | Scenario                     | Approximate score |
-    /// |------------------------------|-------------------|
-    /// | No threats                   | 0.0               |
-    /// | One medium threat            | ~0.35             |
-    /// | One critical threat          | ~0.70             |
-    /// | Two critical threats         | ~0.82             |
-    /// | Three+ critical threats      | 0.90 – 1.0       |
     public var riskScore: Double {
         let active = threats
         guard !active.isEmpty else { return 0.0 }
@@ -165,6 +146,31 @@ public struct SecurityResult: Equatable, Codable, Sendable {
     }
 
     public static let secure = SecurityResult(threats: [])
+
+    // MARK: - Report
+
+    public func generateReport(generatedAt: Date = Date()) -> String {
+        let formatter = ISO8601DateFormatter()
+        var lines: [String] = []
+        lines.append("DeviceSecurityKit Security Report")
+        lines.append("Generated: \(formatter.string(from: generatedAt))")
+        lines.append("Status: \(isSecure ? "Secure" : "Compromised")")
+        lines.append("Risk Score: \(String(format: "%.2f", riskScore)) (\(riskLevel))")
+        lines.append("Threats Detected: \(threats.count)")
+
+        if threats.isEmpty {
+            lines.append("No threats detected.")
+        } else {
+            for threat in threats.sorted(by: { $0.severity > $1.severity }) {
+                lines.append("- [\(threat.severity)] \(threat.rawValue): \(threat.description)")
+                for item in evidence(for: threat) {
+                    lines.append("    • \(item)")
+                }
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
 }
 
 // MARK: - Risk Level

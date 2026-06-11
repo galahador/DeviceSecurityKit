@@ -175,6 +175,10 @@ public final class DSK: DSKClient, @unchecked Sendable {
         monitor.clearThreatHistory()
     }
 
+    public var lastDetectorDiagnostics: [String: DetectorDiagnostic] {
+        monitor.lastDetectorDiagnostics
+    }
+
     // MARK: - Async
 
     @available(iOS 15.0, *)

@@ -33,7 +33,12 @@ public final class AttestationDetector {
     /// `markAttestationSucceeded()` or `markAttestationFailed()` based on the
     /// server's response.
     public static func isAttestationFailed() -> Bool {
-        stateQueue.sync { _hasAttempted && _hasFailed }
+#if os(iOS)
+        guard DCAppAttestService.shared.isSupported else { return false }
+        return stateQueue.sync { _hasAttempted && _hasFailed }
+#else
+        return false
+#endif
     }
 
     /// Whether `attest(challengeHash:completion:)` or one of the
