@@ -8,6 +8,7 @@
 import Foundation
 import Darwin
 import Darwin.C
+import MachO
 
 public final class DebuggerDetector {
     
@@ -284,7 +285,9 @@ public final class DebuggerDetector {
 #if !DEBUG && arch(arm64)
         guard let header = _dyld_get_image_header(0) else { return false }
         var size: UInt = 0
-        guard let section = getsectiondata(header, "__TEXT", "__text", &size) else { return false }
+        guard let section = header.withMemoryRebound(to: mach_header_64.self, capacity: 1, {
+            getsectiondata($0, "__TEXT", "__text", &size)
+        }) else { return false }
         guard size > 0 else { return false }
 
         let checkSize = min(Int(size), 4096)
@@ -348,14 +351,18 @@ public final class DebuggerDetector {
             return false
         }
 
+        var hijacked = false
         for i in 0..<Int(maskCount) {
             if ports[i] != mach_port_t(MACH_PORT_NULL) {
-                logger.info("Custom exception port handler detected at index \(i)")
-                return true
+                if !hijacked {
+                    logger.info("Custom exception port handler detected at index \(i)")
+                    hijacked = true
+                }
+                mach_port_deallocate(mach_task_self_, ports[i])
             }
         }
 
-        return false
+        return hijacked
 #else
         return false
 #endif
