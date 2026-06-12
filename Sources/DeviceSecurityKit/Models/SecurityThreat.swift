@@ -45,41 +45,41 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
     public var description: String {
         switch self {
         case .jailbreak:
-            return "Device is jailbroken"
+            return String(localized: "Device is jailbroken", bundle: .module)
         case .debugger:
-            return "Debugger attached"
+            return String(localized: "Debugger attached", bundle: .module)
         case .emulator:
-            return "Running in emulator"
+            return String(localized: "Running in emulator", bundle: .module)
         case .reverseEngineering:
-            return "App tampering detected"
+            return String(localized: "App tampering detected", bundle: .module)
         case .appIntegrity:
-            return "App signature integrity compromised"
+            return String(localized: "App signature integrity compromised", bundle: .module)
         case .screenRecording:
-            return "Screen is being recorded"
+            return String(localized: "Screen is being recorded", bundle: .module)
         case .hooked:
-            return "Security functions have been hooked"
+            return String(localized: "Security functions have been hooked", bundle: .module)
         case .pinningBypassed:
-            return "Certificate pinning bypass detected"
+            return String(localized: "Certificate pinning bypass detected", bundle: .module)
         case .vpnDetected:
-            return "VPN connection detected"
+            return String(localized: "VPN connection detected", bundle: .module)
         case .proxyDetected:
-            return "Proxy configuration detected"
+            return String(localized: "Proxy configuration detected", bundle: .module)
         case .methodSwizzling:
-            return "Objective-C method swizzling detected"
+            return String(localized: "Objective-C method swizzling detected", bundle: .module)
         case .fridaDetected:
-            return "Frida instrumentation runtime detected"
+            return String(localized: "Frida instrumentation runtime detected", bundle: .module)
         case .attestationFailed:
-            return "Device integrity attestation failed"
+            return String(localized: "Device integrity attestation failed", bundle: .module)
         case .dskTampered:
-            return "Security library integrity compromised"
+            return String(localized: "Security library integrity compromised", bundle: .module)
         case .repackaged:
-            return "App has been resigned with a different certificate"
+            return String(localized: "App has been resigned with a different certificate", bundle: .module)
         case .screenshotTaken:
-            return "User took a screenshot of the app"
+            return String(localized: "User took a screenshot of the app", bundle: .module)
         case .dylibInjection:
-            return "Unauthorized dynamic library injected into process"
+            return String(localized: "Unauthorized dynamic library injected into process", bundle: .module)
         case .noThreat:
-            return "App is Secure"
+            return String(localized: "App is Secure", bundle: .module)
         }
     }
 
@@ -149,11 +149,11 @@ public enum ThreatSeverity: Int, Codable, Comparable, Sendable, CustomStringConv
 
     public var description: String {
         switch self {
-        case .normal:   return "Normal"
-        case .low:      return "Low"
-        case .medium:   return "Medium"
-        case .high:     return "High"
-        case .critical: return "Critical"
+        case .normal:   return String(localized: "Normal", bundle: .module)
+        case .low:      return String(localized: "Low", bundle: .module)
+        case .medium:   return String(localized: "Medium", bundle: .module)
+        case .high:     return String(localized: "High", bundle: .module)
+        case .critical: return String(localized: "Critical", bundle: .module)
         }
     }
 }

@@ -8,6 +8,7 @@
 import Foundation
 import Darwin
 import Darwin.C
+import MachO
 
 public final class DebuggerDetector {
     
@@ -60,9 +61,10 @@ public final class DebuggerDetector {
             ("environment", checkDebuggerEnvironment()),
             ("timing", checkTimingAnalysis()),
             ("breakpoint", checkBreakpointDetection()),
-            ("textIntegrity", checkTextSegmentIntegrity())
+            ("textIntegrity", checkTextSegmentIntegrity()),
+            ("exceptionPorts", checkExceptionPorts())
         ]
-        
+
 #if DEBUG
         for (method, detected) in detectionResults {
             if detected {
@@ -88,7 +90,8 @@ public final class DebuggerDetector {
             "environment": checkDebuggerEnvironment(),
             "timing": checkTimingAnalysis(),
             "breakpoint": checkBreakpointDetection(),
-            "textIntegrity": checkTextSegmentIntegrity()
+            "textIntegrity": checkTextSegmentIntegrity(),
+            "exceptionPorts": checkExceptionPorts()
         ]
     }
     
@@ -282,7 +285,9 @@ public final class DebuggerDetector {
 #if !DEBUG && arch(arm64)
         guard let header = _dyld_get_image_header(0) else { return false }
         var size: UInt = 0
-        guard let section = getsectiondata(header, "__TEXT", "__text", &size) else { return false }
+        guard let section = header.withMemoryRebound(to: mach_header_64.self, capacity: 1, {
+            getsectiondata($0, "__TEXT", "__text", &size)
+        }) else { return false }
         guard size > 0 else { return false }
 
         let checkSize = min(Int(size), 4096)
@@ -310,6 +315,54 @@ public final class DebuggerDetector {
         }
 
         return false
+#else
+        return false
+#endif
+    }
+
+    // MARK: - Exception Port Hijack Check
+
+    private static func checkExceptionPorts() -> Bool {
+#if !DEBUG
+        let exceptionMask = exception_mask_t(
+            EXC_MASK_BAD_ACCESS | EXC_MASK_BAD_INSTRUCTION | EXC_MASK_ARITHMETIC |
+            EXC_MASK_SOFTWARE | EXC_MASK_BREAKPOINT
+        )
+
+        let portCount = Int(EXC_TYPES_COUNT)
+        var masks = [exception_mask_t](repeating: 0, count: portCount)
+        var ports = [mach_port_t](repeating: 0, count: portCount)
+        var behaviors = [exception_behavior_t](repeating: 0, count: portCount)
+        var flavors = [thread_state_flavor_t](repeating: 0, count: portCount)
+        var maskCount = mach_msg_type_number_t(portCount)
+
+        let result = task_get_exception_ports(
+            mach_task_self_,
+            exceptionMask,
+            &masks,
+            &maskCount,
+            &ports,
+            &behaviors,
+            &flavors
+        )
+
+        guard result == KERN_SUCCESS else {
+            logger.error("task_get_exception_ports failed with result: \(result)")
+            return false
+        }
+
+        var hijacked = false
+        for i in 0..<Int(maskCount) {
+            if ports[i] != mach_port_t(MACH_PORT_NULL) {
+                if !hijacked {
+                    logger.info("Custom exception port handler detected at index \(i)")
+                    hijacked = true
+                }
+                mach_port_deallocate(mach_task_self_, ports[i])
+            }
+        }
+
+        return hijacked
 #else
         return false
 #endif

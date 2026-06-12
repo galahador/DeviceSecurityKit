@@ -86,6 +86,47 @@ final class SecurityMonitorTests: XCTestCase {
         XCTAssertTrue(monitor.threatHistory.isEmpty)
     }
 
+    // MARK: - Threat History Persistence
+
+    func testInit_withPersistenceEnabled_loadsPersistedHistory() throws {
+        try XCTSkipUnless(ThreatHistoryStore.shared.isKeychainAvailable(), "Keychain unavailable in this test environment (missing entitlement)")
+
+        ThreatHistoryStore.shared.clear()
+        let persisted = [ThreatEvent(threat: .jailbreak, severity: .critical, detectedAt: Date(), evidence: ["persisted"])]
+        ThreatHistoryStore.shared.save(persisted)
+        defer { ThreatHistoryStore.shared.clear() }
+
+        let monitor = SecurityMonitor(configuration: .disabled.withThreatHistoryPersistence(true))
+        XCTAssertEqual(monitor.threatHistory, persisted)
+    }
+
+    func testInit_withPersistenceDisabled_doesNotLoadPersistedHistory() {
+        ThreatHistoryStore.shared.clear()
+        let persisted = [ThreatEvent(threat: .jailbreak, severity: .critical, detectedAt: Date(), evidence: ["persisted"])]
+        ThreatHistoryStore.shared.save(persisted)
+        defer { ThreatHistoryStore.shared.clear() }
+
+        let monitor = SecurityMonitor(configuration: .disabled)
+        XCTAssertTrue(monitor.threatHistory.isEmpty)
+    }
+
+    func testClearThreatHistory_withPersistenceEnabled_clearsKeychain() {
+        ThreatHistoryStore.shared.save([ThreatEvent(threat: .debugger, severity: .high, detectedAt: Date(), evidence: [])])
+        defer { ThreatHistoryStore.shared.clear() }
+
+        let monitor = SecurityMonitor(configuration: .disabled.withThreatHistoryPersistence(true))
+        monitor.clearThreatHistory()
+
+        XCTAssertTrue(monitor.threatHistory.isEmpty)
+        // Give the async persistence queue a moment to process the clear.
+        let exp = expectation(description: "keychain cleared")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+            XCTAssertTrue(ThreatHistoryStore.shared.load().isEmpty)
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 1.0)
+    }
+
     // MARK: - Callbacks
 
     func testOnStatusChange_returnsMonitor() {

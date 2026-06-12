@@ -36,14 +36,12 @@ public struct SignatureManifest: Codable, Equatable, Sendable {
 
 /// Errors thrown by `SignatureUpdateManager`.
 public enum SignatureUpdateError: Error, Sendable, Equatable {
-    /// `update(from:)` was called before `configure(publicKey:)`.
     case notConfigured
     /// The manifest's signature did not verify against the configured public key.
     case invalidSignature
 }
 
 /// Verifies and applies remotely-distributed detection-signature updates.
-/// try await SignatureUpdateManager.shared.update(from: manifestURL)
 public final class SignatureUpdateManager: @unchecked Sendable {
 
     public static let shared = SignatureUpdateManager()

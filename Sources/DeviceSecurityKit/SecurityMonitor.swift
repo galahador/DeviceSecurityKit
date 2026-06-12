@@ -107,7 +107,15 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     }
 
     public func clearThreatHistory() {
-        stateQueue.sync(flags: .barrier) { _threatHistory.removeAll() }
+        let persistenceEnabled = stateQueue.sync(flags: .barrier) { () -> Bool in
+            _threatHistory.removeAll()
+            return configuration.threatHistoryPersistenceEnabled
+        }
+        if persistenceEnabled {
+            Self.persistenceQueue.async {
+                ThreatHistoryStore.shared.clear()
+            }
+        }
     }
 
     public var lastDetectorDiagnostics: [String: DetectorDiagnostic] {
@@ -119,6 +127,15 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     public init(configuration: DeviceSecurityConfiguration = .default) {
         self.configuration = configuration
         DSKIntegrityChecker.captureBaseline()
+        if configuration.threatHistoryPersistenceEnabled {
+            let persisted = ThreatHistoryStore.shared.load()
+            if !persisted.isEmpty {
+                _threatHistory = persisted
+                if _threatHistory.count > _threatHistoryMaxSize {
+                    _threatHistory.removeFirst(_threatHistory.count - _threatHistoryMaxSize)
+                }
+            }
+        }
     }
 
     deinit {
@@ -128,7 +145,22 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     // MARK: - Configuration
 
     public func configure(_ configuration: DeviceSecurityConfiguration) {
-        stateQueue.sync(flags: .barrier) { self.configuration = configuration }
+        let shouldLoadPersisted = stateQueue.sync(flags: .barrier) { () -> Bool in
+            let wasEnabled = self.configuration.threatHistoryPersistenceEnabled
+            self.configuration = configuration
+            return configuration.threatHistoryPersistenceEnabled && !wasEnabled && _threatHistory.isEmpty
+        }
+        if shouldLoadPersisted {
+            let persisted = ThreatHistoryStore.shared.load()
+            if !persisted.isEmpty {
+                stateQueue.sync(flags: .barrier) {
+                    _threatHistory = persisted
+                    if _threatHistory.count > _threatHistoryMaxSize {
+                        _threatHistory.removeFirst(_threatHistory.count - _threatHistoryMaxSize)
+                    }
+                }
+            }
+        }
 
         if stateQueue.sync(execute: { isMonitoring }) {
             runChecks()
@@ -182,11 +214,6 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     // MARK: - Check Methods
 
     /// Runs all enabled detectors synchronously and returns the result.
-    ///
-    /// - Important: This method may take several seconds depending on enabled
-    ///   detectors and the configured `detectorTimeout`. **Do not call on the
-    ///   main thread** — use `performCheckAsync()` or dispatch to a background
-    ///   queue instead.
     public func performCheck() -> SecurityResult {
         let result = gatherThreats()
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
@@ -354,6 +381,11 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         label: "com.devicesecuritykit.monitor.detectors",
         qos: .userInitiated,
         attributes: .concurrent
+    )
+
+    private static let persistenceQueue = DispatchQueue(
+        label: "com.devicesecuritykit.monitor.persistence",
+        qos: .utility
     )
 
     private func runDetector<T>(name: String,
@@ -552,7 +584,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
 
         // Record into ring buffer and feed AsyncStream consumers
         if !events.isEmpty {
-            stateQueue.sync(flags: .barrier) {
+            let (snapshot, persistenceEnabled) = stateQueue.sync(flags: .barrier) { () -> ([ThreatEvent], Bool) in
                 _threatHistory.append(contentsOf: events)
                 if _threatHistory.count > _threatHistoryMaxSize {
                     _threatHistory.removeFirst(_threatHistory.count - _threatHistoryMaxSize)
@@ -561,6 +593,12 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                     for continuation in _threatEventContinuations.values {
                         continuation.yield(event)
                     }
+                }
+                return (_threatHistory, configuration.threatHistoryPersistenceEnabled)
+            }
+            if persistenceEnabled {
+                Self.persistenceQueue.async {
+                    ThreatHistoryStore.shared.save(snapshot)
                 }
             }
         }

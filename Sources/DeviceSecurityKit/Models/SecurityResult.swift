@@ -151,15 +151,18 @@ public struct SecurityResult: Equatable, Codable, Sendable {
 
     public func generateReport(generatedAt: Date = Date()) -> String {
         let formatter = ISO8601DateFormatter()
+        let statusText = isSecure
+            ? String(localized: "Secure", bundle: .module)
+            : String(localized: "Compromised", bundle: .module)
         var lines: [String] = []
-        lines.append("DeviceSecurityKit Security Report")
-        lines.append("Generated: \(formatter.string(from: generatedAt))")
-        lines.append("Status: \(isSecure ? "Secure" : "Compromised")")
-        lines.append("Risk Score: \(String(format: "%.2f", riskScore)) (\(riskLevel))")
-        lines.append("Threats Detected: \(threats.count)")
+        lines.append(String(localized: "DeviceSecurityKit Security Report", bundle: .module))
+        lines.append("\(String(localized: "Generated:", bundle: .module)) \(formatter.string(from: generatedAt))")
+        lines.append("\(String(localized: "Status:", bundle: .module)) \(statusText)")
+        lines.append("\(String(localized: "Risk Score:", bundle: .module)) \(String(format: "%.2f", riskScore)) (\(riskLevel))")
+        lines.append("\(String(localized: "Threats Detected:", bundle: .module)) \(threats.count)")
 
         if threats.isEmpty {
-            lines.append("No threats detected.")
+            lines.append(String(localized: "No threats detected.", bundle: .module))
         } else {
             for threat in threats.sorted(by: { $0.severity > $1.severity }) {
                 lines.append("- [\(threat.severity)] \(threat.rawValue): \(threat.description)")
@@ -188,11 +191,11 @@ public enum RiskLevel: Int, Codable, Comparable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .none:     return "None"
-        case .low:      return "Low"
-        case .medium:   return "Medium"
-        case .high:     return "High"
-        case .critical: return "Critical"
+        case .none:     return String(localized: "None", bundle: .module)
+        case .low:      return String(localized: "Low", bundle: .module)
+        case .medium:   return String(localized: "Medium", bundle: .module)
+        case .high:     return String(localized: "High", bundle: .module)
+        case .critical: return String(localized: "Critical", bundle: .module)
         }
     }
 }
