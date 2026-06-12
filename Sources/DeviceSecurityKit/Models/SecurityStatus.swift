@@ -35,43 +35,43 @@ public enum SecurityStatus: Equatable, Sendable {
     public var description: String {
         switch self {
         case .secure:
-            return "Device is secure"
+            return String(localized: "Device is secure", bundle: .module)
         case .jailbroken:
-            return "Device is jailbroken"
+            return String(localized: "Device is jailbroken", bundle: .module)
         case .debuggerAttached:
-            return "Debugger is attached"
+            return String(localized: "Debugger is attached", bundle: .module)
         case .emulator:
-            return "Running in emulator"
+            return String(localized: "Running in emulator", bundle: .module)
         case .reverseEngineered:
-            return "App has been tampered"
+            return String(localized: "App has been tampered", bundle: .module)
         case .appIntegrityCompromised:
-            return "App signature integrity compromised"
+            return String(localized: "App signature integrity compromised", bundle: .module)
         case .screenRecording:
-            return "Screen is being recorded"
+            return String(localized: "Screen is being recorded", bundle: .module)
         case .hooked:
-            return "Security functions have been hooked"
+            return String(localized: "Security functions have been hooked", bundle: .module)
         case .methodSwizzled:
-            return "Objective-C method swizzling detected"
+            return String(localized: "Objective-C method swizzling detected", bundle: .module)
         case .pinningBypassed:
-            return "Certificate pinning has been bypassed"
+            return String(localized: "Certificate pinning has been bypassed", bundle: .module)
         case .vpnDetected:
-            return "VPN connection is active"
+            return String(localized: "VPN connection is active", bundle: .module)
         case .proxyDetected:
-            return "Proxy configuration is active"
+            return String(localized: "Proxy configuration is active", bundle: .module)
         case .fridaDetected:
-            return "Frida instrumentation runtime detected"
+            return String(localized: "Frida instrumentation runtime detected", bundle: .module)
         case .attestationFailed:
-            return "Device integrity attestation failed"
+            return String(localized: "Device integrity attestation failed", bundle: .module)
         case .dskTampered:
-            return "Security library integrity compromised"
+            return String(localized: "Security library integrity compromised", bundle: .module)
         case .repackaged:
-            return "App has been resigned with a different certificate"
+            return String(localized: "App has been resigned with a different certificate", bundle: .module)
         case .screenshotTaken:
-            return "User took a screenshot of the app"
+            return String(localized: "User took a screenshot of the app", bundle: .module)
         case .dylibInjection:
-            return "Unauthorized dynamic library injected into process"
+            return String(localized: "Unauthorized dynamic library injected into process", bundle: .module)
         case .compromised:
-            return "Device is compromised"
+            return String(localized: "Device is compromised", bundle: .module)
         }
     }
 }

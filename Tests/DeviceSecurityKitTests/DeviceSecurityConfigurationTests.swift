@@ -73,4 +73,22 @@ final class DeviceSecurityConfigurationTests: XCTestCase {
         XCTAssertNotEqual(DeviceSecurityConfiguration.default, DeviceSecurityConfiguration.production)
         XCTAssertNotEqual(DeviceSecurityConfiguration.default, DeviceSecurityConfiguration.disabled)
     }
+
+    // MARK: - Threat History Persistence
+
+    func testThreatHistoryPersistence_disabledByDefault() {
+        XCTAssertFalse(DeviceSecurityConfiguration.default.threatHistoryPersistenceEnabled)
+    }
+
+    func testWithThreatHistoryPersistence_enables() {
+        let config = DeviceSecurityConfiguration.default.withThreatHistoryPersistence(true)
+        XCTAssertTrue(config.threatHistoryPersistenceEnabled)
+    }
+
+    func testWithThreatHistoryPersistence_isNonMutating() {
+        let original = DeviceSecurityConfiguration.default
+        let modified = original.withThreatHistoryPersistence(true)
+        XCTAssertFalse(original.threatHistoryPersistenceEnabled)
+        XCTAssertTrue(modified.threatHistoryPersistenceEnabled)
+    }
 }

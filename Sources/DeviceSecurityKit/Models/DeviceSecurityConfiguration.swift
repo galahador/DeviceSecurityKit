@@ -30,6 +30,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public var screenshotDetectionEnabled: Bool
     public var dylibInjectionDetectionEnabled: Bool
     public var detectorTimeout: TimeInterval
+    public var threatHistoryPersistenceEnabled: Bool
 
     public init(
         jailbreakCheckEnabled: Bool = true,
@@ -53,7 +54,8 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         expectedCertificateHash: String? = nil,
         screenshotDetectionEnabled: Bool = false,
         dylibInjectionDetectionEnabled: Bool = true,
-        detectorTimeout: TimeInterval = 5.0
+        detectorTimeout: TimeInterval = 5.0,
+        threatHistoryPersistenceEnabled: Bool = false
     ) {
         self.jailbreakCheckEnabled = jailbreakCheckEnabled
         self.debuggerCheckEnabled = debuggerCheckEnabled
@@ -77,6 +79,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         self.screenshotDetectionEnabled = screenshotDetectionEnabled
         self.dylibInjectionDetectionEnabled = dylibInjectionDetectionEnabled
         self.detectorTimeout = detectorTimeout
+        self.threatHistoryPersistenceEnabled = threatHistoryPersistenceEnabled
     }
     
     // MARK: - Presets
@@ -257,6 +260,14 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public func withExpectedFileHashes(_ hashes: [String: String]) -> DeviceSecurityConfiguration {
         var config = self
         config.expectedFileHashes = hashes
+        return config
+    }
+
+    /// Persists `threatHistory` to the Keychain so it survives app relaunch (and
+    /// app deletion, since Keychain items can outlive the app on iOS).
+    public func withThreatHistoryPersistence(_ enabled: Bool) -> DeviceSecurityConfiguration {
+        var config = self
+        config.threatHistoryPersistenceEnabled = enabled
         return config
     }
 }

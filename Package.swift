@@ -17,6 +17,9 @@ let package = Package(
             name: "DeviceSecurityKit",
             dependencies: [],
             path: "Sources",
+            resources: [
+                .process("DeviceSecurityKit/Resources")
+            ],
             linkerSettings: [
                 .linkedFramework("NetworkExtension"),
                 .linkedFramework("DeviceCheck"),
