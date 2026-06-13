@@ -297,6 +297,10 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             ScreenshotDetector.startObserving()
         }
 
+        if stateQueue.sync(execute: { configuration.clipboardMonitoringEnabled }) {
+            ClipboardMonitor.startObserving()
+        }
+
         // Run an immediate first check so the caller isn't blind for the first interval
         runChecks()
         scheduleNextCheck()
@@ -330,6 +334,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         DebuggerDetector.stopContinuousDenyAttach()
 #endif
         ScreenshotDetector.stopObserving()
+        ClipboardMonitor.stopObserving()
     }
 
     // MARK: - Private
@@ -527,6 +532,12 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 evidence[.mdmDetected] = MDMDetector.collectEvidence()
             }
         }
+        if cfg.clipboardMonitoringEnabled {
+            if runDetector(name: "clipboardExfiltration", timeout: timeout, diagnostics: &diagnostics, { ClipboardMonitor.wasClipboardModifiedExternally() }) == true {
+                threats.append(.clipboardExfiltration)
+                evidence[.clipboardExfiltration] = ClipboardMonitor.collectEvidence()
+            }
+        }
 
         stateQueue.sync(flags: .barrier) { _lastDetectorDiagnostics = diagnostics }
 
@@ -659,6 +670,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         if result.isVPNDetected              { return .vpnDetected }
         if result.isProxyDetected            { return .proxyDetected }
         if result.isScreenshotTaken         { return .screenshotTaken }
+        if result.isClipboardExfiltration   { return .clipboardExfiltration }
         // Low
         if result.isMDMDetected             { return .mdmDetected }
 

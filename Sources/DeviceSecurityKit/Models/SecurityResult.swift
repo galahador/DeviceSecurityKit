@@ -101,6 +101,10 @@ public struct SecurityResult: Equatable, Codable, Sendable {
         return threats.contains(.mdmDetected)
     }
 
+    public var isClipboardExfiltration: Bool {
+        return threats.contains(.clipboardExfiltration)
+    }
+
     // MARK: - Threat Queries
 
     /// Returns threats matching the given severity level.

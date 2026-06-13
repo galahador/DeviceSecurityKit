@@ -26,6 +26,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
     case screenshotTaken
     case dylibInjection
     case mdmDetected
+    case clipboardExfiltration
 
     @available(*, deprecated, message: "Use an empty threats array instead of .noThreat")
     case noThreat
@@ -35,7 +36,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             .jailbreak, .debugger, .emulator, .reverseEngineering, .appIntegrity,
             .screenRecording, .hooked, .pinningBypassed, .vpnDetected, .proxyDetected,
             .methodSwizzling, .fridaDetected, .attestationFailed, .dskTampered,
-            .repackaged, .screenshotTaken, .dylibInjection, .mdmDetected
+            .repackaged, .screenshotTaken, .dylibInjection, .mdmDetected, .clipboardExfiltration
         ]
         if let legacy = SecurityThreat(rawValue: "noThreat") {
             cases.append(legacy)
@@ -81,6 +82,8 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             return String(localized: "Unauthorized dynamic library injected into process", bundle: .module)
         case .mdmDetected:
             return String(localized: "Device is under MDM/enterprise management", bundle: .module)
+        case .clipboardExfiltration:
+            return String(localized: "Clipboard contents changed unexpectedly after a sensitive copy", bundle: .module)
         case .noThreat:
             return String(localized: "App is Secure", bundle: .module)
         }
@@ -92,7 +95,8 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
              .hooked, .pinningBypassed, .methodSwizzling, .fridaDetected,
              .attestationFailed, .dskTampered, .repackaged, .dylibInjection:
             return true
-        case .screenRecording, .vpnDetected, .proxyDetected, .screenshotTaken, .mdmDetected, .noThreat:
+        case .screenRecording, .vpnDetected, .proxyDetected, .screenshotTaken, .mdmDetected,
+             .clipboardExfiltration, .noThreat:
             return false
         }
     }
@@ -135,6 +139,8 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             return .critical
         case .mdmDetected:
             return .low
+        case .clipboardExfiltration:
+            return .medium
         case .noThreat:
             return .normal
         }

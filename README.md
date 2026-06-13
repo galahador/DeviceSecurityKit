@@ -45,6 +45,7 @@
 | ⏱️ Monitoring | Continuous background security monitoring, BGTaskScheduler integration |
 | 🔄 Signature Updates | Ed25519-verified remote updates to detection lists |
 | 🏢 MDM Detection | Flags devices running under an enterprise Managed App Configuration |
+| 📋 Clipboard Monitoring | Detects unexpected pasteboard changes after the app copies sensitive data |
 | 🌍 Localization | All user-facing strings (threat/status/severity descriptions, reports) ship via a String Catalog and adapt to the device's locale |
 
 ---
@@ -305,10 +306,25 @@ let config = DeviceSecurityConfiguration.default
         expectedCertificateHash: "a1b2c3..."
     )
     .withMDMDetection(true)
+    .withClipboardMonitoring(true)
 
 DSK.shared
     .configure(config)
     .start()
+```
+
+### Clipboard Monitoring
+
+iOS does not let an app detect when another process *reads* the pasteboard. As a
+practical proxy, call `ClipboardMonitor.markSensitiveCopy()` right after copying
+sensitive data (passwords, OTPs, tokens) to the clipboard. This baselines
+`UIPasteboard.general.changeCount`; if the pasteboard changes again — by this app or
+another process — without another `markSensitiveCopy()` call, DSK reports
+`SecurityThreat.clipboardExfiltration`.
+
+```swift
+UIPasteboard.general.string = oneTimePasscode
+ClipboardMonitor.markSensitiveCopy()
 ```
 
 ---
@@ -532,6 +548,7 @@ DSK.shared.removeAllCountermeasures()
 | VPN / Proxy | 🟡 Medium |
 | Screenshot | 🟡 Medium |
 | MDM / Enterprise Management | 🟢 Low |
+| Clipboard Exfiltration | 🟡 Medium |
 
 ---
 
