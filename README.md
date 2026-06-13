@@ -33,7 +33,7 @@
 | 🧬 Reverse Engineering | Frida, Substrate, libhooker, runtime tampering |
 | 🔒 App Integrity | Code signature validation, Team ID verification, CodeResources hash validation |
 | 🪝 Hook Detection | Runtime function hook detection via ARM64 prologue inspection |
-| 🔄 Swizzling Detection | Objective-C IMP redirection validation |
+| 🔄 Swizzling Detection | Objective-C IMP redirection validation, including biometric (`LAContext`) method hooking |
 | 👾 Frida Detection | Libraries, symbols, process checks, multi-port scanning |
 | 📺 Screen Recording | Active recording and mirroring detection |
 | 📸 Screenshot Detection | Real-time screenshot notifications |
@@ -45,6 +45,7 @@
 | ⏱️ Monitoring | Continuous background security monitoring, BGTaskScheduler integration |
 | 🔄 Signature Updates | Ed25519-verified remote updates to detection lists |
 | 🏢 MDM Detection | Flags devices running under an enterprise Managed App Configuration |
+| 🌍 Localization | All user-facing strings (threat/status/severity descriptions, reports) ship via a String Catalog and adapt to the device's locale |
 
 ---
 
@@ -192,6 +193,21 @@ DSK.shared
 // Later:
 DSK.shared.clearThreatHistory()
 ```
+
+### Threat History Persistence
+
+Opt in to persist `threatHistory` to the Keychain so a tampering event survives an app relaunch or kill — useful for forensics:
+
+```swift
+let config = DeviceSecurityConfiguration.default
+    .withThreatHistoryPersistence(true)
+
+DSK.shared
+    .configure(config)
+    .start()
+```
+
+History is rehydrated from the Keychain on init when enabled, and `clearThreatHistory()` also wipes the persisted copy. Disabled by default.
 
 ### SwiftUI
 
@@ -516,6 +532,12 @@ DSK.shared.removeAllCountermeasures()
 | VPN / Proxy | 🟡 Medium |
 | Screenshot | 🟡 Medium |
 | MDM / Enterprise Management | 🟢 Low |
+
+---
+
+## 🌍 Localization
+
+All user-facing strings — `SecurityThreat.description`, `ThreatSeverity.description`, `SecurityStatus.description`, `RiskLevel.description`, and `SecurityResult.generateReport(...)` — are sourced from a String Catalog (`Localizable.xcstrings`) bundled with DSK. They automatically follow the host app's locale; no extra setup is required. Contribute additional translations by adding languages to the catalog.
 
 ---
 
