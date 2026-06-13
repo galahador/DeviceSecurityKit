@@ -34,6 +34,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public var mdmDetectionEnabled: Bool
     public var clipboardMonitoringEnabled: Bool
     public var externalDisplayDetectionEnabled: Bool
+    public var keyboardExtensionDetectionEnabled: Bool
 
     public init(
         jailbreakCheckEnabled: Bool = true,
@@ -61,7 +62,8 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         threatHistoryPersistenceEnabled: Bool = false,
         mdmDetectionEnabled: Bool = false,
         clipboardMonitoringEnabled: Bool = false,
-        externalDisplayDetectionEnabled: Bool = false
+        externalDisplayDetectionEnabled: Bool = false,
+        keyboardExtensionDetectionEnabled: Bool = false
     ) {
         self.jailbreakCheckEnabled = jailbreakCheckEnabled
         self.debuggerCheckEnabled = debuggerCheckEnabled
@@ -89,6 +91,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         self.mdmDetectionEnabled = mdmDetectionEnabled
         self.clipboardMonitoringEnabled = clipboardMonitoringEnabled
         self.externalDisplayDetectionEnabled = externalDisplayDetectionEnabled
+        self.keyboardExtensionDetectionEnabled = keyboardExtensionDetectionEnabled
     }
     
     // MARK: - Presets
@@ -298,6 +301,12 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public func withExternalDisplayDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.externalDisplayDetectionEnabled = enabled
+        return config
+    }
+
+    public func withKeyboardExtensionDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
+        var config = self
+        config.keyboardExtensionDetectionEnabled = enabled
         return config
     }
 }

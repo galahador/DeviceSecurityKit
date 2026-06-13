@@ -28,6 +28,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
     case mdmDetected
     case clipboardExfiltration
     case externalDisplayConnected
+    case thirdPartyKeyboardActive
 
     @available(*, deprecated, message: "Use an empty threats array instead of .noThreat")
     case noThreat
@@ -38,7 +39,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             .screenRecording, .hooked, .pinningBypassed, .vpnDetected, .proxyDetected,
             .methodSwizzling, .fridaDetected, .attestationFailed, .dskTampered,
             .repackaged, .screenshotTaken, .dylibInjection, .mdmDetected, .clipboardExfiltration,
-            .externalDisplayConnected
+            .externalDisplayConnected, .thirdPartyKeyboardActive
         ]
         if let legacy = SecurityThreat(rawValue: "noThreat") {
             cases.append(legacy)
@@ -88,6 +89,8 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             return String(localized: "Clipboard contents changed unexpectedly after a sensitive copy", bundle: .module)
         case .externalDisplayConnected:
             return String(localized: "An external display is connected — possible screen mirroring", bundle: .module)
+        case .thirdPartyKeyboardActive:
+            return String(localized: "A third-party keyboard is active on a sensitive field", bundle: .module)
         case .noThreat:
             return String(localized: "App is Secure", bundle: .module)
         }
@@ -100,7 +103,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
              .attestationFailed, .dskTampered, .repackaged, .dylibInjection:
             return true
         case .screenRecording, .vpnDetected, .proxyDetected, .screenshotTaken, .mdmDetected,
-             .clipboardExfiltration, .externalDisplayConnected, .noThreat:
+             .clipboardExfiltration, .externalDisplayConnected, .thirdPartyKeyboardActive, .noThreat:
             return false
         }
     }
@@ -146,6 +149,8 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
         case .clipboardExfiltration:
             return .medium
         case .externalDisplayConnected:
+            return .medium
+        case .thirdPartyKeyboardActive:
             return .medium
         case .noThreat:
             return .normal

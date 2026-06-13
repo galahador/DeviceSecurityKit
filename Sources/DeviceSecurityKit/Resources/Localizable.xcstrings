@@ -199,6 +199,17 @@
         }
       }
     },
+    "A third-party keyboard is active on a sensitive field" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A third-party keyboard is active on a sensitive field"
+          }
+        }
+      }
+    },
     "DeviceSecurityKit Security Report" : {
       "extractionState" : "manual",
       "localizations" : {

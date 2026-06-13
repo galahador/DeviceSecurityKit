@@ -305,6 +305,10 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             ExternalDisplayDetector.startObserving()
         }
 
+        if stateQueue.sync(execute: { configuration.keyboardExtensionDetectionEnabled }) {
+            KeyboardExtensionMonitor.startObserving()
+        }
+
         // Run an immediate first check so the caller isn't blind for the first interval
         runChecks()
         scheduleNextCheck()
@@ -340,6 +344,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         ScreenshotDetector.stopObserving()
         ClipboardMonitor.stopObserving()
         ExternalDisplayDetector.stopObserving()
+        KeyboardExtensionMonitor.stopObserving()
     }
 
     // MARK: - Private
@@ -549,6 +554,12 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 evidence[.externalDisplayConnected] = ExternalDisplayDetector.collectEvidence()
             }
         }
+        if cfg.keyboardExtensionDetectionEnabled {
+            if runDetector(name: "thirdPartyKeyboardActive", timeout: timeout, diagnostics: &diagnostics, { KeyboardExtensionMonitor.isThirdPartyKeyboardActive() }) == true {
+                threats.append(.thirdPartyKeyboardActive)
+                evidence[.thirdPartyKeyboardActive] = KeyboardExtensionMonitor.collectEvidence()
+            }
+        }
 
         stateQueue.sync(flags: .barrier) { _lastDetectorDiagnostics = diagnostics }
 
@@ -683,6 +694,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         if result.isScreenshotTaken         { return .screenshotTaken }
         if result.isClipboardExfiltration   { return .clipboardExfiltration }
         if result.isExternalDisplayConnected { return .externalDisplayConnected }
+        if result.isThirdPartyKeyboardActive { return .thirdPartyKeyboardActive }
         // Low
         if result.isMDMDetected             { return .mdmDetected }
 

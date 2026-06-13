@@ -145,4 +145,22 @@ final class DeviceSecurityConfigurationTests: XCTestCase {
         XCTAssertFalse(original.externalDisplayDetectionEnabled)
         XCTAssertTrue(modified.externalDisplayDetectionEnabled)
     }
+
+    // MARK: - Keyboard Extension Detection
+
+    func testKeyboardExtensionDetection_disabledByDefault() {
+        XCTAssertFalse(DeviceSecurityConfiguration.default.keyboardExtensionDetectionEnabled)
+    }
+
+    func testWithKeyboardExtensionDetection_enables() {
+        let config = DeviceSecurityConfiguration.default.withKeyboardExtensionDetection(true)
+        XCTAssertTrue(config.keyboardExtensionDetectionEnabled)
+    }
+
+    func testWithKeyboardExtensionDetection_isNonMutating() {
+        let original = DeviceSecurityConfiguration.default
+        let modified = original.withKeyboardExtensionDetection(true)
+        XCTAssertFalse(original.keyboardExtensionDetectionEnabled)
+        XCTAssertTrue(modified.keyboardExtensionDetectionEnabled)
+    }
 }
