@@ -46,6 +46,7 @@
 | 🔄 Signature Updates | Ed25519-verified remote updates to detection lists |
 | 🏢 MDM Detection | Flags devices running under an enterprise Managed App Configuration |
 | 📋 Clipboard Monitoring | Detects unexpected pasteboard changes after the app copies sensitive data |
+| 🖥️ External Display Detection | Flags AirPlay screen mirroring or external/wired monitor connections |
 | 🌍 Localization | All user-facing strings (threat/status/severity descriptions, reports) ship via a String Catalog and adapt to the device's locale |
 
 ---
@@ -307,6 +308,7 @@ let config = DeviceSecurityConfiguration.default
     )
     .withMDMDetection(true)
     .withClipboardMonitoring(true)
+    .withExternalDisplayDetection(true)
 
 DSK.shared
     .configure(config)
@@ -326,6 +328,14 @@ another process — without another `markSensitiveCopy()` call, DSK reports
 UIPasteboard.general.string = oneTimePasscode
 ClipboardMonitor.markSensitiveCopy()
 ```
+
+### External Display Detection
+
+When `withExternalDisplayDetection(true)` is enabled, DSK checks
+`UIScreen.screens.count > 1` to detect AirPlay screen mirroring or a connected
+external/wired monitor. If a second screen is present, DSK reports
+`SecurityThreat.externalDisplayConnected` — useful for hiding sensitive content
+(e.g. with `secureScreen(dsk:)`) while the device's screen is being mirrored.
 
 ---
 
@@ -549,6 +559,7 @@ DSK.shared.removeAllCountermeasures()
 | Screenshot | 🟡 Medium |
 | MDM / Enterprise Management | 🟢 Low |
 | Clipboard Exfiltration | 🟡 Medium |
+| External Display Connected | 🟡 Medium |
 
 ---
 

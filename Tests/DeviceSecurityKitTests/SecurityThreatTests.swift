@@ -46,7 +46,8 @@ final class SecurityThreatTests: XCTestCase {
             .jailbreak, .debugger, .emulator, .reverseEngineering, .appIntegrity,
             .screenRecording, .hooked, .pinningBypassed, .vpnDetected, .proxyDetected,
             .methodSwizzling, .fridaDetected, .attestationFailed, .dskTampered,
-            .repackaged, .screenshotTaken, .dylibInjection, .mdmDetected, .clipboardExfiltration
+            .repackaged, .screenshotTaken, .dylibInjection, .mdmDetected, .clipboardExfiltration,
+            .externalDisplayConnected
         ]
         if let legacy = SecurityThreat(rawValue: "noThreat") {
             expectedThreats.insert(legacy)

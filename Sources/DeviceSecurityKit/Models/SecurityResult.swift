@@ -105,6 +105,10 @@ public struct SecurityResult: Equatable, Codable, Sendable {
         return threats.contains(.clipboardExfiltration)
     }
 
+    public var isExternalDisplayConnected: Bool {
+        return threats.contains(.externalDisplayConnected)
+    }
+
     // MARK: - Threat Queries
 
     /// Returns threats matching the given severity level.

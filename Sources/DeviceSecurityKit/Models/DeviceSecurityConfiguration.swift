@@ -33,6 +33,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public var threatHistoryPersistenceEnabled: Bool
     public var mdmDetectionEnabled: Bool
     public var clipboardMonitoringEnabled: Bool
+    public var externalDisplayDetectionEnabled: Bool
 
     public init(
         jailbreakCheckEnabled: Bool = true,
@@ -59,7 +60,8 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         detectorTimeout: TimeInterval = 5.0,
         threatHistoryPersistenceEnabled: Bool = false,
         mdmDetectionEnabled: Bool = false,
-        clipboardMonitoringEnabled: Bool = false
+        clipboardMonitoringEnabled: Bool = false,
+        externalDisplayDetectionEnabled: Bool = false
     ) {
         self.jailbreakCheckEnabled = jailbreakCheckEnabled
         self.debuggerCheckEnabled = debuggerCheckEnabled
@@ -86,6 +88,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         self.threatHistoryPersistenceEnabled = threatHistoryPersistenceEnabled
         self.mdmDetectionEnabled = mdmDetectionEnabled
         self.clipboardMonitoringEnabled = clipboardMonitoringEnabled
+        self.externalDisplayDetectionEnabled = externalDisplayDetectionEnabled
     }
     
     // MARK: - Presets
@@ -288,6 +291,13 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public func withClipboardMonitoring(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.clipboardMonitoringEnabled = enabled
+        return config
+    }
+
+    /// Flags when an external display (AirPlay mirroring, wired/wireless monitor) is connected
+    public func withExternalDisplayDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
+        var config = self
+        config.externalDisplayDetectionEnabled = enabled
         return config
     }
 }
