@@ -521,6 +521,12 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 evidence[.dylibInjection] = DylibInjectionDetector.collectEvidence()
             }
         }
+        if cfg.mdmDetectionEnabled {
+            if runDetector(name: "mdmDetected", timeout: timeout, diagnostics: &diagnostics, { MDMDetector.isManagedConfigurationPresent() }) == true {
+                threats.append(.mdmDetected)
+                evidence[.mdmDetected] = MDMDetector.collectEvidence()
+            }
+        }
 
         stateQueue.sync(flags: .barrier) { _lastDetectorDiagnostics = diagnostics }
 
@@ -653,6 +659,8 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         if result.isVPNDetected              { return .vpnDetected }
         if result.isProxyDetected            { return .proxyDetected }
         if result.isScreenshotTaken         { return .screenshotTaken }
+        // Low
+        if result.isMDMDetected             { return .mdmDetected }
 
         return .compromised
     }

@@ -31,6 +31,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public var dylibInjectionDetectionEnabled: Bool
     public var detectorTimeout: TimeInterval
     public var threatHistoryPersistenceEnabled: Bool
+    public var mdmDetectionEnabled: Bool
 
     public init(
         jailbreakCheckEnabled: Bool = true,
@@ -55,7 +56,8 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         screenshotDetectionEnabled: Bool = false,
         dylibInjectionDetectionEnabled: Bool = true,
         detectorTimeout: TimeInterval = 5.0,
-        threatHistoryPersistenceEnabled: Bool = false
+        threatHistoryPersistenceEnabled: Bool = false,
+        mdmDetectionEnabled: Bool = false
     ) {
         self.jailbreakCheckEnabled = jailbreakCheckEnabled
         self.debuggerCheckEnabled = debuggerCheckEnabled
@@ -80,6 +82,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         self.dylibInjectionDetectionEnabled = dylibInjectionDetectionEnabled
         self.detectorTimeout = detectorTimeout
         self.threatHistoryPersistenceEnabled = threatHistoryPersistenceEnabled
+        self.mdmDetectionEnabled = mdmDetectionEnabled
     }
     
     // MARK: - Presets
@@ -268,6 +271,13 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public func withThreatHistoryPersistence(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.threatHistoryPersistenceEnabled = enabled
+        return config
+    }
+
+    /// Flags devices/apps running under an enterprise MDM configuration
+    public func withMDMDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
+        var config = self
+        config.mdmDetectionEnabled = enabled
         return config
     }
 }

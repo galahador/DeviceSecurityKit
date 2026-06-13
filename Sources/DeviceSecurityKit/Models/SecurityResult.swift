@@ -97,6 +97,10 @@ public struct SecurityResult: Equatable, Codable, Sendable {
         return threats.contains(.dylibInjection)
     }
 
+    public var isMDMDetected: Bool {
+        return threats.contains(.mdmDetected)
+    }
+
     // MARK: - Threat Queries
 
     /// Returns threats matching the given severity level.
