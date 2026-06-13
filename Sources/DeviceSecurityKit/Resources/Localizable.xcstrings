@@ -166,6 +166,17 @@
         }
       }
     },
+    "Device is under MDM/enterprise management" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device is under MDM/enterprise management"
+          }
+        }
+      }
+    },
     "DeviceSecurityKit Security Report" : {
       "extractionState" : "manual",
       "localizations" : {

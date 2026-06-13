@@ -25,6 +25,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
     case repackaged
     case screenshotTaken
     case dylibInjection
+    case mdmDetected
 
     @available(*, deprecated, message: "Use an empty threats array instead of .noThreat")
     case noThreat
@@ -34,7 +35,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             .jailbreak, .debugger, .emulator, .reverseEngineering, .appIntegrity,
             .screenRecording, .hooked, .pinningBypassed, .vpnDetected, .proxyDetected,
             .methodSwizzling, .fridaDetected, .attestationFailed, .dskTampered,
-            .repackaged, .screenshotTaken, .dylibInjection
+            .repackaged, .screenshotTaken, .dylibInjection, .mdmDetected
         ]
         if let legacy = SecurityThreat(rawValue: "noThreat") {
             cases.append(legacy)
@@ -78,6 +79,8 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             return String(localized: "User took a screenshot of the app", bundle: .module)
         case .dylibInjection:
             return String(localized: "Unauthorized dynamic library injected into process", bundle: .module)
+        case .mdmDetected:
+            return String(localized: "Device is under MDM/enterprise management", bundle: .module)
         case .noThreat:
             return String(localized: "App is Secure", bundle: .module)
         }
@@ -89,7 +92,7 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
              .hooked, .pinningBypassed, .methodSwizzling, .fridaDetected,
              .attestationFailed, .dskTampered, .repackaged, .dylibInjection:
             return true
-        case .screenRecording, .vpnDetected, .proxyDetected, .screenshotTaken, .noThreat:
+        case .screenRecording, .vpnDetected, .proxyDetected, .screenshotTaken, .mdmDetected, .noThreat:
             return false
         }
     }
@@ -130,6 +133,8 @@ public enum SecurityThreat: String, CaseIterable, Codable, Equatable, Sendable {
             return .medium
         case .dylibInjection:
             return .critical
+        case .mdmDetected:
+            return .low
         case .noThreat:
             return .normal
         }

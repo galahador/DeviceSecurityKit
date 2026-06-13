@@ -91,4 +91,22 @@ final class DeviceSecurityConfigurationTests: XCTestCase {
         XCTAssertFalse(original.threatHistoryPersistenceEnabled)
         XCTAssertTrue(modified.threatHistoryPersistenceEnabled)
     }
+
+    // MARK: - MDM Detection
+
+    func testMDMDetection_disabledByDefault() {
+        XCTAssertFalse(DeviceSecurityConfiguration.default.mdmDetectionEnabled)
+    }
+
+    func testWithMDMDetection_enables() {
+        let config = DeviceSecurityConfiguration.default.withMDMDetection(true)
+        XCTAssertTrue(config.mdmDetectionEnabled)
+    }
+
+    func testWithMDMDetection_isNonMutating() {
+        let original = DeviceSecurityConfiguration.default
+        let modified = original.withMDMDetection(true)
+        XCTAssertFalse(original.mdmDetectionEnabled)
+        XCTAssertTrue(modified.mdmDetectionEnabled)
+    }
 }

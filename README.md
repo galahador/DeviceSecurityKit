@@ -44,6 +44,7 @@
 | 🛡️ DSK Integrity | Runtime validation of DSK internals |
 | ⏱️ Monitoring | Continuous background security monitoring, BGTaskScheduler integration |
 | 🔄 Signature Updates | Ed25519-verified remote updates to detection lists |
+| 🏢 MDM Detection | Flags devices running under an enterprise Managed App Configuration |
 | 🌍 Localization | All user-facing strings (threat/status/severity descriptions, reports) ship via a String Catalog and adapt to the device's locale |
 
 ---
@@ -303,6 +304,7 @@ let config = DeviceSecurityConfiguration.default
         true,
         expectedCertificateHash: "a1b2c3..."
     )
+    .withMDMDetection(true)
 
 DSK.shared
     .configure(config)
@@ -529,6 +531,7 @@ DSK.shared.removeAllCountermeasures()
 | Emulator | 🟡 Medium |
 | VPN / Proxy | 🟡 Medium |
 | Screenshot | 🟡 Medium |
+| MDM / Enterprise Management | 🟢 Low |
 
 ---
 
