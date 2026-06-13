@@ -127,4 +127,22 @@ final class DeviceSecurityConfigurationTests: XCTestCase {
         XCTAssertFalse(original.clipboardMonitoringEnabled)
         XCTAssertTrue(modified.clipboardMonitoringEnabled)
     }
+
+    // MARK: - External Display Detection
+
+    func testExternalDisplayDetection_disabledByDefault() {
+        XCTAssertFalse(DeviceSecurityConfiguration.default.externalDisplayDetectionEnabled)
+    }
+
+    func testWithExternalDisplayDetection_enables() {
+        let config = DeviceSecurityConfiguration.default.withExternalDisplayDetection(true)
+        XCTAssertTrue(config.externalDisplayDetectionEnabled)
+    }
+
+    func testWithExternalDisplayDetection_isNonMutating() {
+        let original = DeviceSecurityConfiguration.default
+        let modified = original.withExternalDisplayDetection(true)
+        XCTAssertFalse(original.externalDisplayDetectionEnabled)
+        XCTAssertTrue(modified.externalDisplayDetectionEnabled)
+    }
 }

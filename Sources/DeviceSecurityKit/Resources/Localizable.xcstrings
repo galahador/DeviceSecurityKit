@@ -188,6 +188,17 @@
         }
       }
     },
+    "An external display is connected — possible screen mirroring" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An external display is connected — possible screen mirroring"
+          }
+        }
+      }
+    },
     "DeviceSecurityKit Security Report" : {
       "extractionState" : "manual",
       "localizations" : {

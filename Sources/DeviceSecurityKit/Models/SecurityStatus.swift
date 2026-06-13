@@ -28,6 +28,7 @@ public enum SecurityStatus: Equatable, Sendable {
     case dylibInjection
     case mdmDetected
     case clipboardExfiltration
+    case externalDisplayConnected
     case compromised
 
     public var isSecure: Bool {
@@ -76,6 +77,8 @@ public enum SecurityStatus: Equatable, Sendable {
             return String(localized: "Device is under MDM/enterprise management", bundle: .module)
         case .clipboardExfiltration:
             return String(localized: "Clipboard contents changed unexpectedly after a sensitive copy", bundle: .module)
+        case .externalDisplayConnected:
+            return String(localized: "An external display is connected — possible screen mirroring", bundle: .module)
         case .compromised:
             return String(localized: "Device is compromised", bundle: .module)
         }
