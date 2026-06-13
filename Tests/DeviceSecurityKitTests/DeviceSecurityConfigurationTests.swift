@@ -109,4 +109,22 @@ final class DeviceSecurityConfigurationTests: XCTestCase {
         XCTAssertFalse(original.mdmDetectionEnabled)
         XCTAssertTrue(modified.mdmDetectionEnabled)
     }
+
+    // MARK: - Clipboard Monitoring
+
+    func testClipboardMonitoring_disabledByDefault() {
+        XCTAssertFalse(DeviceSecurityConfiguration.default.clipboardMonitoringEnabled)
+    }
+
+    func testWithClipboardMonitoring_enables() {
+        let config = DeviceSecurityConfiguration.default.withClipboardMonitoring(true)
+        XCTAssertTrue(config.clipboardMonitoringEnabled)
+    }
+
+    func testWithClipboardMonitoring_isNonMutating() {
+        let original = DeviceSecurityConfiguration.default
+        let modified = original.withClipboardMonitoring(true)
+        XCTAssertFalse(original.clipboardMonitoringEnabled)
+        XCTAssertTrue(modified.clipboardMonitoringEnabled)
+    }
 }

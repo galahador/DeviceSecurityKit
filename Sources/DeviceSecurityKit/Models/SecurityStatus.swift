@@ -27,6 +27,7 @@ public enum SecurityStatus: Equatable, Sendable {
     case screenshotTaken
     case dylibInjection
     case mdmDetected
+    case clipboardExfiltration
     case compromised
 
     public var isSecure: Bool {
@@ -73,6 +74,8 @@ public enum SecurityStatus: Equatable, Sendable {
             return String(localized: "Unauthorized dynamic library injected into process", bundle: .module)
         case .mdmDetected:
             return String(localized: "Device is under MDM/enterprise management", bundle: .module)
+        case .clipboardExfiltration:
+            return String(localized: "Clipboard contents changed unexpectedly after a sensitive copy", bundle: .module)
         case .compromised:
             return String(localized: "Device is compromised", bundle: .module)
         }

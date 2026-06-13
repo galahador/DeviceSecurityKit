@@ -32,6 +32,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public var detectorTimeout: TimeInterval
     public var threatHistoryPersistenceEnabled: Bool
     public var mdmDetectionEnabled: Bool
+    public var clipboardMonitoringEnabled: Bool
 
     public init(
         jailbreakCheckEnabled: Bool = true,
@@ -57,7 +58,8 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         dylibInjectionDetectionEnabled: Bool = true,
         detectorTimeout: TimeInterval = 5.0,
         threatHistoryPersistenceEnabled: Bool = false,
-        mdmDetectionEnabled: Bool = false
+        mdmDetectionEnabled: Bool = false,
+        clipboardMonitoringEnabled: Bool = false
     ) {
         self.jailbreakCheckEnabled = jailbreakCheckEnabled
         self.debuggerCheckEnabled = debuggerCheckEnabled
@@ -83,6 +85,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         self.detectorTimeout = detectorTimeout
         self.threatHistoryPersistenceEnabled = threatHistoryPersistenceEnabled
         self.mdmDetectionEnabled = mdmDetectionEnabled
+        self.clipboardMonitoringEnabled = clipboardMonitoringEnabled
     }
     
     // MARK: - Presets
@@ -278,6 +281,13 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public func withMDMDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.mdmDetectionEnabled = enabled
+        return config
+    }
+
+    /// Watches for the pasteboard changing
+    public func withClipboardMonitoring(_ enabled: Bool) -> DeviceSecurityConfiguration {
+        var config = self
+        config.clipboardMonitoringEnabled = enabled
         return config
     }
 }
