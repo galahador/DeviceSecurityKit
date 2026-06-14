@@ -27,14 +27,14 @@
 
 | Category | Detection |
 |-----------|-----------|
-| 🔓 Jailbreak | Files, sandbox escape, fork capability, URL schemes, symlinks, environment variables |
+| 🔓 Jailbreak | Files, sandbox escape, fork capability, URL schemes, symlinks, environment variables, TrollStore markers, and anti-detection tweak signatures (Shadow, Liberty Lite, A-Bypass) |
 | 🐞 Debugger | sysctl, ptrace, parent process, timing analysis, breakpoint instructions |
 | 📱 Emulator | Hardware mismatch, simulator artifacts, DeviceCheck validation |
 | 🧬 Reverse Engineering | Frida, Substrate, libhooker, runtime tampering |
 | 🔒 App Integrity | Code signature validation, Team ID verification, CodeResources hash validation |
 | 🪝 Hook Detection | Runtime function hook detection via ARM64 prologue inspection |
 | 🔄 Swizzling Detection | Objective-C IMP redirection validation, including biometric (`LAContext`) method hooking |
-| 👾 Frida Detection | Libraries, symbols, process checks, multi-port scanning |
+| 👾 Frida Detection | Libraries, symbols, process checks, multi-port scanning, Frida Gadget dylib signatures, frida-server filesystem artifacts |
 | 📺 Screen Recording | Active recording and mirroring detection |
 | 📸 Screenshot Detection | Real-time screenshot notifications |
 | 🌐 Pinning Bypass Detection | Detects bypass tools (SSLKillSwitch, ssl-proxy, etc.) and proxy configurations — not a substitute for implementing certificate/public-key pinning in your networking stack |
@@ -47,7 +47,9 @@
 | 🏢 MDM Detection | Flags devices running under an enterprise Managed App Configuration |
 | 📋 Clipboard Monitoring | Detects unexpected pasteboard changes after the app copies sensitive data |
 | 🖥️ External Display Detection | Flags AirPlay screen mirroring or external/wired monitor connections |
+| ⌨️ Keyboard Detection | Flags third-party keyboard extensions active on sensitive input fields |
 | 🌍 Localization | All user-facing strings (threat/status/severity descriptions, reports) ship via a String Catalog and adapt to the device's locale |
+| 🛠️ CI Scanning | `dsk-scan` CLI runs static integrity/repackaging checks against a built `.ipa`/`.app` for CI pre-submission gates |
 
 ---
 
@@ -309,6 +311,7 @@ let config = DeviceSecurityConfiguration.default
     .withMDMDetection(true)
     .withClipboardMonitoring(true)
     .withExternalDisplayDetection(true)
+    .withKeyboardExtensionDetection(true)
 
 DSK.shared
     .configure(config)
@@ -336,6 +339,26 @@ When `withExternalDisplayDetection(true)` is enabled, DSK checks
 external/wired monitor. If a second screen is present, DSK reports
 `SecurityThreat.externalDisplayConnected` — useful for hiding sensitive content
 (e.g. with `secureScreen(dsk:)`) while the device's screen is being mirrored.
+
+### Keyboard Extension Detection
+
+When `withKeyboardExtensionDetection(true)` is enabled, mark sensitive fields
+(password, OTP, payment, etc.) as they become active so DSK can flag a
+third-party keyboard extension being used to type into them:
+
+```swift
+func textFieldDidBeginEditing(_ textField: UITextField) {
+    KeyboardExtensionMonitor.markSensitiveFieldActive(textField)
+}
+
+func textFieldDidEndEditing(_ textField: UITextField) {
+    KeyboardExtensionMonitor.markSensitiveFieldInactive()
+}
+```
+
+If the active input mode isn't an Apple system keyboard while a sensitive
+field is marked active, DSK reports `SecurityThreat.thirdPartyKeyboardActive`
+within a configurable detection window (`KeyboardExtensionMonitor.detectionWindowSeconds`, default 10s).
 
 ---
 
@@ -380,6 +403,20 @@ print(SignatureUpdateManager.shared.entries(for: .jailbreakPaths))
 ```
 
 The manifest is a signed envelope (`payload` + `signature`); `update(from:)` verifies the signature against the configured public key before applying or caching it. An invalid signature throws `SignatureUpdateError.invalidSignature`, and calling `update(from:)` before `configure(publicKey:)` throws `.notConfigured`. The most recently verified manifest is cached on disk and reloaded automatically the next time `configure(publicKey:)` is called.
+
+---
+
+## 🛠️ CI Pre-Submission Scanning (`dsk-scan`)
+
+`dsk-scan` is a standalone CLI executable shipped alongside the package. It runs the same
+static checks as `AppIntegrityDetector`/`RepackagingDetector` — but offline, against a built
+`.ipa` or `.app` — so you can gate CI before submitting to the App Store.
+
+```bash
+swift run dsk-scan Build/MyApp.ipa \
+    --expected-certificate-hash a1b2c3... \
+    --expected-team-id ABCDE12345
+```
 
 ---
 
@@ -560,6 +597,7 @@ DSK.shared.removeAllCountermeasures()
 | MDM / Enterprise Management | 🟢 Low |
 | Clipboard Exfiltration | 🟡 Medium |
 | External Display Connected | 🟡 Medium |
+| Third-Party Keyboard Active | 🟡 Medium |
 
 ---
 
