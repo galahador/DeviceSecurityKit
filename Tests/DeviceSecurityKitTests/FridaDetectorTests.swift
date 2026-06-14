@@ -38,6 +38,22 @@ final class FridaDetectorTests: XCTestCase {
         XCTAssertEqual(FridaDetector.defaultPorts.count, 5)
     }
 
+    // MARK: - Frida Gadget / frida-server Signature Checks
+
+    func testCollectEvidence_noGadgetDylibSignature() {
+        #if targetEnvironment(simulator)
+        let evidence = FridaDetector.collectEvidence(portScanEnabled: false)
+        XCTAssertFalse(evidence.contains("fridaGadgetDylibSignature"), "No FridaGadget.dylib expected on clean simulator")
+        #endif
+    }
+
+    func testCollectEvidence_noFridaServerFilesystemArtifacts() {
+        #if targetEnvironment(simulator)
+        let evidence = FridaDetector.collectEvidence(portScanEnabled: false)
+        XCTAssertFalse(evidence.contains { $0.hasPrefix("fridaServerFilesystemArtifact") }, "No re.frida.server artifacts expected on clean simulator")
+        #endif
+    }
+
     // MARK: - SecurityResult Integration
 
     func testSecurityResult_isFridaDetected() {
