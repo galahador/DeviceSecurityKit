@@ -63,7 +63,7 @@ final class SignatureUpdateManagerTests: XCTestCase {
 
     func testSignatureCategory_allCasesAreUnique() {
         let cases = SignatureCategory.allCases
-        XCTAssertEqual(cases.count, 10)
+        XCTAssertEqual(cases.count, 11)
         XCTAssertEqual(Set(cases.map(\.rawValue)).count, cases.count)
     }
 
