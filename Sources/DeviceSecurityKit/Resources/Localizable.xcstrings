@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "A third-party keyboard is active on a sensitive field" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A third-party keyboard is active on a sensitive field"
+          }
+        }
+      }
+    },
+    "An external display is connected — possible screen mirroring" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An external display is connected — possible screen mirroring"
+          }
+        }
+      }
+    },
     "App has been resigned with a different certificate" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -184,28 +206,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Device is under MDM/enterprise management"
-          }
-        }
-      }
-    },
-    "An external display is connected — possible screen mirroring" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "An external display is connected — possible screen mirroring"
-          }
-        }
-      }
-    },
-    "A third-party keyboard is active on a sensitive field" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A third-party keyboard is active on a sensitive field"
           }
         }
       }
