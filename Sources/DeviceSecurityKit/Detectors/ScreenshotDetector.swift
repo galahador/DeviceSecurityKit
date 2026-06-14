@@ -6,9 +6,7 @@
 //
 
 import Foundation
-#if canImport(UIKit)
 import UIKit
-#endif
 
 internal final class ScreenshotDetector {
 
@@ -50,14 +48,12 @@ internal final class ScreenshotDetector {
         }
         guard !alreadyObserving else { return }
 
-#if canImport(UIKit)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleScreenshot),
             name: UIApplication.userDidTakeScreenshotNotification,
             object: nil
         )
-#endif
     }
 
     /// Stops observing and clears detection state.
@@ -68,18 +64,15 @@ internal final class ScreenshotDetector {
             _lastScreenshotDate = nil
         }
 
-#if canImport(UIKit)
         NotificationCenter.default.removeObserver(
             self,
             name: UIApplication.userDidTakeScreenshotNotification,
             object: nil
         )
-#endif
     }
 
     // MARK: - Private
 
-#if canImport(UIKit)
     @objc private static func handleScreenshot() {
         logger.warning("Screenshot detected")
         stateQueue.sync(flags: .barrier) {
@@ -87,5 +80,4 @@ internal final class ScreenshotDetector {
             _lastScreenshotDate = Date()
         }
     }
-#endif
 }

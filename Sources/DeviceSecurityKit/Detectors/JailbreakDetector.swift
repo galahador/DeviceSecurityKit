@@ -6,9 +6,7 @@
 //
 
 import Foundation
-#if canImport(UIKit)
 import UIKit
-#endif
 import Darwin
 
 public final class JailbreakDetector {
@@ -21,7 +19,7 @@ public final class JailbreakDetector {
     private static let _urlSchemeChecker: ((URL) -> Bool)? = defaultURLSchemeChecker()
 
     private static func defaultURLSchemeChecker() -> ((URL) -> Bool)? {
-#if canImport(UIKit) && !targetEnvironment(simulator)
+#if !targetEnvironment(simulator)
         return { url in
             // canOpenURL must be called on the main thread
             if Thread.isMainThread {

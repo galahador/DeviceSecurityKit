@@ -29,6 +29,7 @@ public enum SecurityStatus: Equatable, Sendable {
     case mdmDetected
     case clipboardExfiltration
     case externalDisplayConnected
+    case thirdPartyKeyboardActive
     case compromised
 
     public var isSecure: Bool {
@@ -79,6 +80,8 @@ public enum SecurityStatus: Equatable, Sendable {
             return String(localized: "Clipboard contents changed unexpectedly after a sensitive copy", bundle: .module)
         case .externalDisplayConnected:
             return String(localized: "An external display is connected — possible screen mirroring", bundle: .module)
+        case .thirdPartyKeyboardActive:
+            return String(localized: "A third-party keyboard is active on a sensitive field", bundle: .module)
         case .compromised:
             return String(localized: "Device is compromised", bundle: .module)
         }

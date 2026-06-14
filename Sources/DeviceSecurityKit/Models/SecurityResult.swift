@@ -109,6 +109,10 @@ public struct SecurityResult: Equatable, Codable, Sendable {
         return threats.contains(.externalDisplayConnected)
     }
 
+    public var isThirdPartyKeyboardActive: Bool {
+        return threats.contains(.thirdPartyKeyboardActive)
+    }
+
     // MARK: - Threat Queries
 
     /// Returns threats matching the given severity level.

@@ -6,9 +6,7 @@
 //
 
 import Foundation
-#if canImport(UIKit)
 import UIKit
-#endif
 
 /// Monitors the system pasteboard for unexpected changes
 public final class ClipboardMonitor {
@@ -27,7 +25,6 @@ public final class ClipboardMonitor {
 
     /// Call immediately after copying sensitive data
     public static func markSensitiveCopy() {
-#if canImport(UIKit)
         let count = UIPasteboard.general.changeCount
         stateQueue.sync(flags: .barrier) {
             _sensitiveCopyChangeCount = count
@@ -35,7 +32,6 @@ public final class ClipboardMonitor {
             _externalChangeDetected = false
             _lastExternalChangeDate = nil
         }
-#endif
     }
 
     public static var detectionWindowSeconds: TimeInterval {
@@ -63,21 +59,17 @@ public final class ClipboardMonitor {
         let alreadyObserving = stateQueue.sync(flags: .barrier) { () -> Bool in
             if _isObserving { return true }
             _isObserving = true
-#if canImport(UIKit)
             _lastKnownChangeCount = UIPasteboard.general.changeCount
-#endif
             return false
         }
         guard !alreadyObserving else { return }
 
-#if canImport(UIKit)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handlePasteboardChange),
             name: UIPasteboard.changedNotification,
             object: nil
         )
-#endif
     }
 
     /// Stops observing and clears detection state.
@@ -90,18 +82,15 @@ public final class ClipboardMonitor {
             _lastExternalChangeDate = nil
         }
 
-#if canImport(UIKit)
         NotificationCenter.default.removeObserver(
             self,
             name: UIPasteboard.changedNotification,
             object: nil
         )
-#endif
     }
 
     // MARK: - Private
 
-#if canImport(UIKit)
     @objc private static func handlePasteboardChange() {
         let currentCount = UIPasteboard.general.changeCount
         stateQueue.sync(flags: .barrier) {
@@ -113,5 +102,4 @@ public final class ClipboardMonitor {
             _lastExternalChangeDate = Date()
         }
     }
-#endif
 }
