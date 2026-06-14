@@ -4,27 +4,42 @@ import PackageDescription
 let package = Package(
     name: "DeviceSecurityKit",
     platforms: [
-        .iOS(.v15)
+        .iOS(.v15),
+        .macOS(.v13)
     ],
     products: [
         .library(
             name: "DeviceSecurityKit",
             targets: ["DeviceSecurityKit"]
+        ),
+        .executable(
+            name: "dsk-scan",
+            targets: ["dsk-scan"]
         )
     ],
     targets: [
         .target(
-            name: "DeviceSecurityKit",
+            name: "DSKStaticAnalysis",
             dependencies: [],
-            path: "Sources",
+            path: "Sources/DSKStaticAnalysis"
+        ),
+        .target(
+            name: "DeviceSecurityKit",
+            dependencies: ["DSKStaticAnalysis"],
+            path: "Sources/DeviceSecurityKit",
             resources: [
-                .process("DeviceSecurityKit/Resources")
+                .process("Resources")
             ],
             linkerSettings: [
                 .linkedFramework("NetworkExtension"),
                 .linkedFramework("DeviceCheck"),
                 .linkedFramework("BackgroundTasks")
             ]
+        ),
+        .executableTarget(
+            name: "dsk-scan",
+            dependencies: ["DSKStaticAnalysis"],
+            path: "Sources/dsk-scan"
         ),
         .testTarget(
             name: "DeviceSecurityKitTests",

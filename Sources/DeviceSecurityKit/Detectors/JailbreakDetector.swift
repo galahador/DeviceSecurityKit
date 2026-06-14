@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 import Darwin
+import MachO
 
 public final class JailbreakDetector {
     
@@ -46,6 +47,7 @@ public final class JailbreakDetector {
             || checkSymbolicLinks()
             || checkSuspiciousEnvironmentVars()
             || checkPrebootJailbreakPaths()
+            || checkAntiDetectionToolLoadedImages()
     }
     
     public static func getDetectionDetails() -> [String] {
@@ -57,6 +59,7 @@ public final class JailbreakDetector {
         evidence.append(contentsOf: collectSymlinkEvidence())
         evidence.append(contentsOf: collectEnvVarEvidence())
         evidence.append(contentsOf: collectPrebootEvidence())
+        evidence.append(contentsOf: collectAntiDetectionToolEvidence())
         return evidence
     }
 
@@ -107,6 +110,19 @@ public final class JailbreakDetector {
         }
         return found
 #endif
+    }
+
+    private static func collectAntiDetectionToolEvidence() -> [String] {
+        var found: [String] = []
+        let count = _dyld_image_count()
+        for i in 0..<count {
+            guard let rawName = _dyld_get_image_name(i) else { continue }
+            let path = String(cString: rawName).lowercased()
+            for marker in jailbreakListOptions.antiDetectionToolMarkers where path.contains(marker) {
+                found.append("antiDetectionTool(\"\(path)\")")
+            }
+        }
+        return found
     }
 
     private static func collectPrebootEvidence() -> [String] {
@@ -232,6 +248,21 @@ public final class JailbreakDetector {
             let jbPath = "\(prebootPath)/\(entry)/jb"
             if FileManager.default.fileExists(atPath: jbPath)
                 || FileManager.default.isReadableFile(atPath: jbPath) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Detects jailbreak-hiding tweaks (e.g. Shadow, Liberty Lite, A-Bypass) by
+    /// scanning loaded images for their injected hook dylibs.
+    private static func checkAntiDetectionToolLoadedImages() -> Bool {
+        let count = _dyld_image_count()
+        for i in 0..<count {
+            guard let rawName = _dyld_get_image_name(i) else { continue }
+            let path = String(cString: rawName).lowercased()
+            for marker in jailbreakListOptions.antiDetectionToolMarkers where path.contains(marker) {
+                logger.warning("Anti-jailbreak-detection tweak detected in loaded images")
                 return true
             }
         }

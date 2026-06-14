@@ -72,4 +72,29 @@ final class JailbreakDetectorTests: XCTestCase {
         let options = JailbreakListOptions()
         XCTAssertTrue(options.urlSchemes.contains("apple-magnifier://"))
     }
+
+    // MARK: - Anti-Detection Tool Lists
+
+    func testJailbreakListOptions_includesAntiDetectionToolMarkers() {
+        let options = JailbreakListOptions()
+        XCTAssertTrue(options.antiDetectionToolMarkers.contains("shadow.dylib"))
+        XCTAssertTrue(options.antiDetectionToolMarkers.contains("libertylite"))
+        XCTAssertTrue(options.antiDetectionToolMarkers.contains("abypass"))
+    }
+
+    func testJailbreakListOptions_includesAntiDetectionToolPaths() {
+        let options = JailbreakListOptions()
+        XCTAssertTrue(options.suspiciousPaths.contains("/Library/MobileSubstrate/DynamicLibraries/Shadow.dylib"))
+        XCTAssertTrue(options.suspiciousPaths.contains("/Library/MobileSubstrate/DynamicLibraries/LibertyLite.dylib"))
+        XCTAssertTrue(options.suspiciousPaths.contains("/Library/MobileSubstrate/DynamicLibraries/ABypass.dylib"))
+        XCTAssertTrue(options.suspiciousPaths.contains("/var/jb/Library/MobileSubstrate/DynamicLibraries/Shadow.dylib"))
+        XCTAssertTrue(options.suspiciousPaths.contains("/var/mobile/Library/Preferences/com.opa334.shadow.plist"))
+    }
+
+    func testGetDetectionDetails_simulator_noAntiDetectionToolFalsePositives() {
+        #if targetEnvironment(simulator)
+        let details = JailbreakDetector.getDetectionDetails()
+        XCTAssertFalse(details.contains { $0.hasPrefix("antiDetectionTool(") })
+        #endif
+    }
 }

@@ -15,6 +15,7 @@ public enum SignatureCategory: String, Codable, CaseIterable, Sendable {
     case jailbreakEnvVars
     case jailbreakURLSchemes
     case jailbreakTestPaths
+    case jailbreakAntiDetectionMarkers
     case debuggerProcessNames
     case debuggerEnvVars
     case emulatorPaths
