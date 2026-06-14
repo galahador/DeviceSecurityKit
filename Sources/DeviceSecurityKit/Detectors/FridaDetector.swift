@@ -25,6 +25,8 @@ public final class FridaDetector {
         return checkLoadedLibraries()
             || checkFridaSymbols()
             || checkGadgetArtifacts()
+            || checkFridaGadgetDylibSignature()
+            || checkFridaServerFilesystemArtifacts()
             || (portScanEnabled && checkFridaPort(ports: ports ?? defaultPorts))
     }
 
@@ -62,6 +64,14 @@ public final class FridaDetector {
                     }
                 }
             }
+        }
+
+        if checkFridaGadgetDylibSignature() {
+            evidence.append("fridaGadgetDylibSignature")
+        }
+
+        for path in fridaServerArtifactPaths where FileManager.default.fileExists(atPath: path) {
+            evidence.append("fridaServerFilesystemArtifact(\"\(path)\")")
         }
 
         return evidence
@@ -102,6 +112,42 @@ public final class FridaDetector {
     // The generic "frida" marker in `checkLoadedLibraries` misses Gadget
     private static func checkGadgetArtifacts() -> Bool {
         return checkGadgetLoadedImages() || checkGadgetConfigArtifacts()
+    }
+
+    /// Filesystem locations dropped by the `re.frida.server` jailbreak tweak / frida-server binary.
+    private static let fridaServerArtifactPaths: [String] = [
+        o.reveal([0xF2, 0x5F, 0x05, 0x6C, 0x0C, 0xF1, 0xE2, 0x97, 0x1F, 0x9E, 0xC8, 0xF2, 0xAE, 0x6C, 0x53, 0x62, 0xBA, 0x97, 0xF2, 0xCF, 0xDF, 0x4A, 0xD4, 0x5B, 0xFE, 0xB5, 0x97, 0x40, 0x71, 0xE9, 0x1D, 0xB9, 0x7D, 0xFD, 0x1F, 0x72, 0xA3, 0x07, 0xD0, 0xFA, 0x1A, 0x8D, 0x59, 0xE7, 0x34, 0xD7, 0x84, 0x32]), // /Library/LaunchDaemons/re.frida.server.plist
+        o.reveal([0x29, 0xB0, 0x79, 0xC9, 0xA0, 0x8F, 0xEA, 0xE0, 0x9E, 0xF3, 0x06, 0x89, 0x77, 0xD0, 0x5A, 0x85, 0xC4, 0xFB, 0xF1, 0x28, 0x0C, 0x67, 0xF8, 0xAB, 0xD9, 0x4A]), // /usr/sbin/frida-server
+        o.reveal([0x28, 0x0F, 0xD5, 0xD6, 0x22, 0x32, 0xB2, 0x61, 0xD4, 0xED, 0xF9, 0xD3, 0x74, 0x5C, 0x84, 0x6C, 0xE8, 0xCB]), // /usr/lib/frida
+    ]
+
+    /// Fingerprints the exact FridaGadget.dylib
+    private static func checkFridaGadgetDylibSignature() -> Bool {
+        let gadgetDylibName = o.reveal([0x5C, 0xCA, 0x21, 0x9A, 0x1A, 0x55, 0xE9, 0xC7, 0x03, 0xFE, 0xCA, 0x95, 0x4D, 0x5D, 0x92, 0x60, 0xFF, 0xE1, 0x22, 0x53, 0x1F]) // fridagadget.dylib
+
+        let count = _dyld_image_count()
+        for i in 0..<count {
+            guard let rawName = _dyld_get_image_name(i) else { continue }
+            let path = String(cString: rawName)
+            let basename = (path as NSString).lastPathComponent.lowercased()
+            if basename == gadgetDylibName {
+                logger.warning("FridaGadget.dylib signature detected in loaded images: \(SecurityLogger.redact(path))")
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Checks for filesystem artifacts left by the `re.frida.server` jailbreak tweak / frida-server binary.
+    private static func checkFridaServerFilesystemArtifacts() -> Bool {
+        let fm = FileManager.default
+        for path in fridaServerArtifactPaths {
+            if fm.fileExists(atPath: path) {
+                logger.warning("frida-server filesystem artifact detected: \(SecurityLogger.redact(path))")
+                return true
+            }
+        }
+        return false
     }
 
     private static func checkGadgetLoadedImages() -> Bool {
