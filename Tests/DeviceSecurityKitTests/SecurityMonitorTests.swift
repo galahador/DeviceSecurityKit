@@ -8,6 +8,12 @@
 import XCTest
 @testable import DeviceSecurityKit
 
+private final class StubScreenRecordingProvider: ScreenRecordingProvider, @unchecked Sendable {
+    var isRecording: Bool
+    init(isRecording: Bool) { self.isRecording = isRecording }
+    func isScreenBeingRecorded() -> Bool { isRecording }
+}
+
 final class SecurityMonitorTests: XCTestCase {
 
     // MARK: - Initialization
@@ -203,5 +209,154 @@ final class SecurityMonitorTests: XCTestCase {
         XCTAssertEqual(diagnostics["jailbreak"]?.timedOut, false)
         // dskTampered always runs regardless of configuration
         XCTAssertNotNil(diagnostics["dskTampered"])
+    }
+
+    // MARK: - Real Threat Pipeline (via injected ScreenRecordingProvider)
+
+    func testPerformCheck_realThreat_populatesThreatHistory() {
+        let monitor = SecurityMonitor(configuration: .disabled.withScreenRecordingCheck(true))
+        monitor.screenRecordingProvider = StubScreenRecordingProvider(isRecording: true)
+
+        let result = monitor.performCheck()
+
+        XCTAssertTrue(result.threats.contains(.screenRecording))
+        XCTAssertEqual(monitor.threatHistory.count, 1)
+        XCTAssertEqual(monitor.threatHistory.first?.threat, .screenRecording)
+        XCTAssertEqual(monitor.threatHistory.first?.severity, .high)
+        XCTAssertEqual(monitor.threatHistory.first?.evidence, ["screenBeingRecorded"])
+    }
+
+    func testPerformCheck_realThreat_firesOnThreatEventWithMatchingEvent() {
+        let monitor = SecurityMonitor(configuration: .disabled.withScreenRecordingCheck(true))
+        monitor.screenRecordingProvider = StubScreenRecordingProvider(isRecording: true)
+
+        var receivedEvent: ThreatEvent?
+        var receivedThreat: SecurityThreat?
+        var receivedStatus: SecurityStatus?
+        monitor.onThreatEvent { receivedEvent = $0 }
+        monitor.onThreatDetected { receivedThreat = $0 }
+        monitor.onStatusChange { receivedStatus = $0 }
+
+        monitor.performCheck()
+
+        let exp = expectation(description: "main queue flush")
+        DispatchQueue.main.async { exp.fulfill() }
+        wait(for: [exp], timeout: 1.0)
+
+        XCTAssertEqual(receivedThreat, .screenRecording)
+        XCTAssertEqual(receivedStatus, .screenRecording)
+        XCTAssertEqual(receivedEvent?.threat, .screenRecording)
+        XCTAssertEqual(receivedEvent, monitor.threatHistory.first)
+    }
+
+    func testPerformCheck_sameThreatPersisting_doesNotDuplicateHistoryOrRefireCallback() {
+        let monitor = SecurityMonitor(configuration: .disabled.withScreenRecordingCheck(true))
+        let provider = StubScreenRecordingProvider(isRecording: true)
+        monitor.screenRecordingProvider = provider
+
+        var fireCount = 0
+        monitor.onThreatEvent { _ in fireCount += 1 }
+
+        monitor.performCheck()
+        monitor.performCheck()
+        monitor.performCheck()
+
+        let exp = expectation(description: "main queue flush")
+        DispatchQueue.main.async { exp.fulfill() }
+        wait(for: [exp], timeout: 1.0)
+
+        XCTAssertEqual(monitor.threatHistory.count, 1, "A threat that stays present across checks should not be recorded again")
+        XCTAssertEqual(fireCount, 1, "onThreatEvent should only fire when a threat newly appears")
+    }
+
+    func testPerformCheck_threatClearing_removesStatusButKeepsHistory() {
+        let monitor = SecurityMonitor(configuration: .disabled.withScreenRecordingCheck(true))
+        let provider = StubScreenRecordingProvider(isRecording: true)
+        monitor.screenRecordingProvider = provider
+
+        monitor.performCheck()
+        XCTAssertEqual(monitor.threatHistory.count, 1)
+
+        provider.isRecording = false
+        let result = monitor.performCheck()
+
+        XCTAssertTrue(result.isSecure)
+        XCTAssertEqual(monitor.threatHistory.count, 1, "Clearing a threat should not remove it from history")
+    }
+
+    func testThreatHistory_ringBuffer_trimsToMaxSize() {
+        let monitor = SecurityMonitor(configuration: .disabled.withScreenRecordingCheck(true))
+        monitor.threatHistoryMaxSize = 2
+        monitor.threatCallbackThrottleInterval = 0
+        let provider = StubScreenRecordingProvider(isRecording: false)
+        monitor.screenRecordingProvider = provider
+
+        for _ in 0..<4 {
+            provider.isRecording = true
+            monitor.performCheck()
+            provider.isRecording = false
+            monitor.performCheck()
+        }
+
+        XCTAssertEqual(monitor.threatHistory.count, 2, "Ring buffer should never exceed threatHistoryMaxSize")
+        XCTAssertTrue(monitor.threatHistory.allSatisfy { $0.threat == .screenRecording })
+    }
+
+    func testThreatHistoryMaxSize_reducingSize_trimsOldestFirst() {
+        let monitor = SecurityMonitor(configuration: .disabled.withScreenRecordingCheck(true))
+        monitor.threatCallbackThrottleInterval = 0
+        let provider = StubScreenRecordingProvider(isRecording: false)
+        monitor.screenRecordingProvider = provider
+
+        for _ in 0..<3 {
+            provider.isRecording = true
+            monitor.performCheck()
+            provider.isRecording = false
+            monitor.performCheck()
+        }
+        XCTAssertEqual(monitor.threatHistory.count, 3)
+
+        monitor.threatHistoryMaxSize = 1
+        XCTAssertEqual(monitor.threatHistory.count, 1)
+    }
+
+    // MARK: - Integration: configure -> performCheck -> callbacks -> history -> adaptive interval
+
+    func testIntegration_startMonitoring_withRealThreat_updatesEverything() {
+        let monitor = SecurityMonitor(configuration: .disabled.withScreenRecordingCheck(true))
+        let provider = StubScreenRecordingProvider(isRecording: true)
+        monitor.screenRecordingProvider = provider
+        monitor.monitoringInterval = 60.0
+        monitor.minMonitoringInterval = 5.0
+
+        var statusEvents: [SecurityStatus] = []
+        var threatEvents: [ThreatEvent] = []
+        monitor.onStatusChange { statusEvents.append($0) }
+        monitor.onThreatEvent { threatEvents.append($0) }
+
+        monitor.startMonitoring()
+        defer { monitor.stopMonitoring() }
+
+        let exp = expectation(description: "main queue flush")
+        DispatchQueue.main.async { exp.fulfill() }
+        wait(for: [exp], timeout: 1.0)
+
+        XCTAssertEqual(statusEvents, [.screenRecording])
+        XCTAssertEqual(threatEvents.map(\.threat), [.screenRecording])
+        XCTAssertEqual(monitor.threatHistory.count, 1)
+        XCTAssertEqual(monitor.currentMonitoringInterval, monitor.minMonitoringInterval)
+    }
+
+    func testIntegration_startMonitoring_noThreats_backsOffTowardMax() {
+        let monitor = SecurityMonitor(configuration: .disabled)
+        monitor.monitoringInterval = 1.0
+        monitor.minMonitoringInterval = 0.1
+        monitor.maxMonitoringInterval = 10.0
+
+        monitor.startMonitoring()
+        defer { monitor.stopMonitoring() }
+
+        XCTAssertGreaterThan(monitor.currentMonitoringInterval, monitor.monitoringInterval, "First clean cycle should back the interval off above the base interval")
+        XCTAssertTrue(monitor.threatHistory.isEmpty)
     }
 }

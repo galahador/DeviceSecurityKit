@@ -131,6 +131,24 @@ public final class DSK: DSKClient, @unchecked Sendable {
         monitor.removeAllCountermeasures()
     }
 
+    // MARK: - Event Sinks
+
+    @discardableResult
+    public func addEventSink(_ sink: any SecurityEventSink) -> Self {
+        monitor.addEventSink(sink)
+        return self
+    }
+
+    @discardableResult
+    public func removeEventSink(_ sink: any SecurityEventSink) -> Self {
+        monitor.removeEventSink(sink)
+        return self
+    }
+
+    public func removeAllEventSinks() {
+        monitor.removeAllEventSinks()
+    }
+
     // MARK: - Lifecycle
     public func start() {
         monitor.startMonitoring()
@@ -146,12 +164,6 @@ public final class DSK: DSKClient, @unchecked Sendable {
         return monitor.status
     }
 
-    /// Runs all enabled detectors synchronously and returns the result.
-    ///
-    /// - Important: This method may take several seconds depending on enabled
-    ///   detectors and the configured `detectorTimeout`. **Do not call on the
-    ///   main thread** — use `performCheckAsync()` or dispatch to a background
-    ///   queue instead.
     @discardableResult
     public func performCheck() -> SecurityResult {
         return monitor.performCheck()
@@ -204,7 +216,6 @@ public final class DSK: DSKClient, @unchecked Sendable {
     }
 
     /// A live stream of `SecurityStatus` changes.
-    /// Unlike `onStatusChange`, which holds a single overwritable handler,
     @available(iOS 15.0, *)
     public var statusUpdates: AsyncStream<SecurityStatus> {
         monitor.statusUpdates

@@ -33,6 +33,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     private var _onThreatEvent: ((ThreatEvent) -> Void)?
     private var _screenRecordingProvider: ScreenRecordingProvider? = DefaultScreenRecordingProvider()
     private var _countermeasures: [Countermeasure] = []
+    private var _eventSinks: [ObjectIdentifier: any SecurityEventSink] = [:]
     private var _threatEventContinuations: [UUID: AsyncStream<ThreatEvent>.Continuation] = [:]
     private var _statusContinuations: [UUID: AsyncStream<SecurityStatus>.Continuation] = [:]
 
@@ -211,13 +212,33 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         stateQueue.sync(flags: .barrier) { _countermeasures.removeAll() }
     }
 
+    // MARK: - Event Sinks
+
+    @discardableResult
+    public func addEventSink(_ sink: any SecurityEventSink) -> Self {
+        stateQueue.sync(flags: .barrier) { _eventSinks[ObjectIdentifier(sink)] = sink }
+        return self
+    }
+
+    @discardableResult
+    public func removeEventSink(_ sink: any SecurityEventSink) -> Self {
+        stateQueue.sync(flags: .barrier) { _ = _eventSinks.removeValue(forKey: ObjectIdentifier(sink)) }
+        return self
+    }
+
+    public func removeAllEventSinks() {
+        stateQueue.sync(flags: .barrier) { _eventSinks.removeAll() }
+    }
+
     // MARK: - Check Methods
 
     /// Runs all enabled detectors synchronously and returns the result.
+    @discardableResult
     public func performCheck() -> SecurityResult {
         let result = gatherThreats()
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
-        firePending(pending, evidence: result.evidence)
+        let events = firePending(pending, evidence: result.evidence)
+        fireEventSinks(result: result, statusChange: pending.statusChange, events: events)
         return result
     }
 
@@ -351,9 +372,9 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
 
     private func runChecks() {
         let result = gatherThreats()
-        // Bug 6 fix: applyResult writes multiple state fields — needs .barrier.
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
-        firePending(pending, evidence: result.evidence)
+        let events = firePending(pending, evidence: result.evidence)
+        fireEventSinks(result: result, statusChange: pending.statusChange, events: events)
 
         let hasThreats = !result.threats.isEmpty
         let (interval, cycles) = stateQueue.sync(flags: .barrier) { () -> (TimeInterval, Int) in
@@ -596,6 +617,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         return (statusChange, newThreats, Array(currentThreats), now)
     }
 
+    @discardableResult
     private func firePending(
         _ pending: (
             statusChange: SecurityStatus?,
@@ -604,8 +626,8 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             detectedAt: Date
         ),
         evidence: [SecurityThreat: [String]]
-    ) {
-        guard pending.statusChange != nil || !pending.newThreats.isEmpty || !pending.currentThreats.isEmpty else { return }
+    ) -> [ThreatEvent] {
+        guard pending.statusChange != nil || !pending.newThreats.isEmpty || !pending.currentThreats.isEmpty else { return [] }
 
         let (statusHandler, threatHandler, threatEventHandler, countermeasures) = stateQueue.sync {
             (_onStatusChange, _onThreatDetected, _onThreatEvent, _countermeasures)
@@ -650,7 +672,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
 
-        guard pending.statusChange != nil || !pending.newThreats.isEmpty || !countermeasures.isEmpty else { return }
+        guard pending.statusChange != nil || !pending.newThreats.isEmpty || !countermeasures.isEmpty else { return events }
         DispatchQueue.main.async {
             // Countermeasures fire on main thread so UI work is safe
             for cm in countermeasures {
@@ -667,6 +689,21 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 threatHandler?(threat)
                 threatEventHandler?(event)
             }
+        }
+        return events
+    }
+
+    private func fireEventSinks(result: SecurityResult, statusChange: SecurityStatus?, events: [ThreatEvent]) {
+        let sinks = stateQueue.sync { Array(_eventSinks.values) }
+        guard !sinks.isEmpty else { return }
+        DispatchQueue.main.async {
+            if let status = statusChange {
+                for sink in sinks { sink.statusChanged(to: status) }
+            }
+            for event in events {
+                for sink in sinks { sink.threatDetected(event) }
+            }
+            for sink in sinks { sink.checkCompleted(result) }
         }
     }
 

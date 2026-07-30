@@ -23,6 +23,11 @@ public protocol DSKClient: AnyObject {
     @discardableResult func onThreatEvent(_ handler: @escaping (ThreatEvent) -> Void) -> Self
     @discardableResult func threatCallbackThrottleInterval(_ interval: TimeInterval) -> Self
 
+    // MARK: - Event Sinks
+    @discardableResult func addEventSink(_ sink: any SecurityEventSink) -> Self
+    @discardableResult func removeEventSink(_ sink: any SecurityEventSink) -> Self
+    func removeAllEventSinks()
+
     // MARK: - Countermeasures
     @discardableResult func countermeasure(for threat: SecurityThreat, throttled: Bool, action: @escaping @Sendable (SecurityThreat) -> Void) -> Self
     @discardableResult func countermeasure(forMinimumSeverity severity: ThreatSeverity, throttled: Bool, action: @escaping @Sendable (SecurityThreat) -> Void) -> Self
