@@ -49,6 +49,11 @@ public protocol SecurityMonitorType {
 
     func removeAllCountermeasures()
 
+    // MARK: - Event Sinks
+    @discardableResult func addEventSink(_ sink: any SecurityEventSink) -> Self
+    @discardableResult func removeEventSink(_ sink: any SecurityEventSink) -> Self
+    func removeAllEventSinks()
+
     // MARK: - Threat History
     var threatHistory: [ThreatEvent] { get }
     var threatHistoryMaxSize: Int { get set }
