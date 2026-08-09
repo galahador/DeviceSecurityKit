@@ -14,6 +14,7 @@ public final class DSKObservable: ObservableObject {
 
     @Published public private(set) var status: SecurityStatus
     @Published public private(set) var threatHistory: [ThreatEvent]
+    @Published public private(set) var activeThreats: Set<SecurityThreat>
 
     private let dsk: DSK
     private var statusTask: Task<Void, Never>?
@@ -24,11 +25,13 @@ public final class DSKObservable: ObservableObject {
         self.dsk = dsk
         self.status = dsk.status
         self.threatHistory = dsk.threatHistory
+        self.activeThreats = dsk.currentThreats
 
         statusTask = Task { [weak self] in
             guard let self else { return }
             for await status in dsk.statusUpdates {
                 self.status = status
+                self.activeThreats = dsk.currentThreats
             }
         }
 
@@ -36,6 +39,7 @@ public final class DSKObservable: ObservableObject {
             guard let self else { return }
             for await _ in dsk.threatEvents {
                 self.threatHistory = dsk.threatHistory
+                self.activeThreats = dsk.currentThreats
             }
         }
     }

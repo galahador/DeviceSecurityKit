@@ -85,6 +85,12 @@ public final class DSK: DSKClient, @unchecked Sendable {
         return self
     }
 
+    @discardableResult
+    public func checkCoalescingWindow(_ window: TimeInterval) -> Self {
+        monitor.checkCoalescingWindow = window
+        return self
+    }
+
     // MARK: - Countermeasures
     @discardableResult
     public func countermeasure(
@@ -162,6 +168,10 @@ public final class DSK: DSKClient, @unchecked Sendable {
 
     public var status: SecurityStatus {
         return monitor.status
+    }
+
+    public var currentThreats: Set<SecurityThreat> {
+        return monitor.currentThreats
     }
 
     @discardableResult

@@ -11,12 +11,16 @@ public protocol SecurityMonitorType {
 
     var status: SecurityStatus { get }
 
+    var currentThreats: Set<SecurityThreat> { get }
+
     var monitoringInterval: TimeInterval { get set }
     var minMonitoringInterval: TimeInterval { get set }
     var maxMonitoringInterval: TimeInterval { get set }
     var currentMonitoringInterval: TimeInterval { get }
 
     var threatCallbackThrottleInterval: TimeInterval { get set }
+
+    var checkCoalescingWindow: TimeInterval { get set }
 
     var screenRecordingProvider: ScreenRecordingProvider? { get set }
 
