@@ -19,7 +19,7 @@ public struct SecureScreenModifier<Overlay: View>: ViewModifier {
     }
 
     private var shouldCover: Bool {
-        observable.status == .screenRecording || observable.status == .screenshotTaken
+        observable.activeThreats.contains(.screenRecording) || observable.activeThreats.contains(.screenshotTaken)
     }
 
     public func body(content: Content) -> some View {

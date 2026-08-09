@@ -22,6 +22,7 @@ public protocol DSKClient: AnyObject {
     @discardableResult func onThreatDetected(_ handler: @escaping (SecurityThreat) -> Void) -> Self
     @discardableResult func onThreatEvent(_ handler: @escaping (ThreatEvent) -> Void) -> Self
     @discardableResult func threatCallbackThrottleInterval(_ interval: TimeInterval) -> Self
+    @discardableResult func checkCoalescingWindow(_ window: TimeInterval) -> Self
 
     // MARK: - Event Sinks
     @discardableResult func addEventSink(_ sink: any SecurityEventSink) -> Self
@@ -42,6 +43,8 @@ public protocol DSKClient: AnyObject {
 
     // MARK: - Accessors
     var status: SecurityStatus { get }
+
+    var currentThreats: Set<SecurityThreat> { get }
 
     /// Runs all enabled detectors synchronously and returns the result.
     @discardableResult func performCheck() -> SecurityResult

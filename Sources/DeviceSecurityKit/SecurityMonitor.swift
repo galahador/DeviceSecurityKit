@@ -8,17 +8,17 @@
 import Foundation
 
 public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
-
+    
     // MARK: - Private Properties
     private var monitoringTimer: DispatchSourceTimer?
     private let timerQueue = DispatchQueue(label: "com.devicesecuritykit.monitor", qos: .userInitiated)
-
+    
     private let stateQueue = DispatchQueue(
         label: "com.devicesecuritykit.monitor.state",
         qos: .userInitiated,
         attributes: .concurrent
     )
-
+    
     private var configuration: DeviceSecurityConfiguration
     private var hasPerformedInitialCheck = false
     private var isMonitoring = false
@@ -26,7 +26,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     private var _previousThreats: Set<SecurityThreat> = []
     private var _lastThreatCallbackTime: [SecurityThreat: Date] = [:]
     private var _threatCallbackThrottleInterval: TimeInterval = 300
-
+    
     // MARK: - Handlers (protected by stateQueue)
     private var _onStatusChange: ((SecurityStatus) -> Void)?
     private var _onThreatDetected: ((SecurityThreat) -> Void)?
@@ -36,26 +36,30 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     private var _eventSinks: [ObjectIdentifier: any SecurityEventSink] = [:]
     private var _threatEventContinuations: [UUID: AsyncStream<ThreatEvent>.Continuation] = [:]
     private var _statusContinuations: [UUID: AsyncStream<SecurityStatus>.Continuation] = [:]
-
+    
     // MARK: - Threat History (ring buffer, protected by stateQueue)
     private var _threatHistory: [ThreatEvent] = []
     private var _threatHistoryMaxSize: Int = 100
-
+    
     // MARK: - Detector Diagnostics (protected by stateQueue)
     private var _lastDetectorDiagnostics: [String: DetectorDiagnostic] = [:]
-
+    
     // MARK: - Public Properties
     public var status: SecurityStatus {
         stateQueue.sync { _status }
     }
 
+    public var currentThreats: Set<SecurityThreat> {
+        stateQueue.sync { _previousThreats }
+    }
+    
     // MARK: - Adaptive Interval
     private var _currentInterval: TimeInterval = 60.0
     private var _minInterval: TimeInterval = 5.0
     private var _maxInterval: TimeInterval = 300.0
     private var _baseInterval: TimeInterval = 60.0
     private var _consecutiveCleanCycles: Int = 0
-
+    
     public var monitoringInterval: TimeInterval {
         get { stateQueue.sync { _baseInterval } }
         set {
@@ -66,35 +70,35 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
     }
-
+    
     public var minMonitoringInterval: TimeInterval {
         get { stateQueue.sync { _minInterval } }
         set { stateQueue.sync(flags: .barrier) { _minInterval = max(newValue, 1.0) } }
     }
-
+    
     public var maxMonitoringInterval: TimeInterval {
         get { stateQueue.sync { _maxInterval } }
         set { stateQueue.sync(flags: .barrier) { _maxInterval = newValue } }
     }
-
+    
     public var currentMonitoringInterval: TimeInterval {
         stateQueue.sync { _currentInterval }
     }
-
+    
     public var threatCallbackThrottleInterval: TimeInterval {
         get { stateQueue.sync { _threatCallbackThrottleInterval } }
         set { stateQueue.sync(flags: .barrier) { _threatCallbackThrottleInterval = newValue } }
     }
-
+    
     public var screenRecordingProvider: ScreenRecordingProvider? {
         get { stateQueue.sync { _screenRecordingProvider } }
         set { stateQueue.sync(flags: .barrier) { _screenRecordingProvider = newValue } }
     }
-
+    
     public var threatHistory: [ThreatEvent] {
         stateQueue.sync { _threatHistory }
     }
-
+    
     public var threatHistoryMaxSize: Int {
         get { stateQueue.sync { _threatHistoryMaxSize } }
         set {
@@ -106,7 +110,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
     }
-
+    
     public func clearThreatHistory() {
         let persistenceEnabled = stateQueue.sync(flags: .barrier) { () -> Bool in
             _threatHistory.removeAll()
@@ -118,13 +122,13 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
     }
-
+    
     public var lastDetectorDiagnostics: [String: DetectorDiagnostic] {
         stateQueue.sync { _lastDetectorDiagnostics }
     }
-
+    
     // MARK: - Initialization
-
+    
     public init(configuration: DeviceSecurityConfiguration = .default) {
         self.configuration = configuration
         DSKIntegrityChecker.captureBaseline()
@@ -138,13 +142,13 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
     }
-
+    
     deinit {
         stopMonitoring()
     }
-
+    
     // MARK: - Configuration
-
+    
     public func configure(_ configuration: DeviceSecurityConfiguration) {
         let shouldLoadPersisted = stateQueue.sync(flags: .barrier) { () -> Bool in
             let wasEnabled = self.configuration.threatHistoryPersistenceEnabled
@@ -162,37 +166,37 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 }
             }
         }
-
+        
         if stateQueue.sync(execute: { isMonitoring }) {
             runChecks()
         }
     }
-
+    
     public func currentConfiguration() -> DeviceSecurityConfiguration {
         stateQueue.sync { configuration }
     }
-
+    
     // MARK: - Handlers
     @discardableResult
     public func onStatusChange(_ handler: @escaping (SecurityStatus) -> Void) -> Self {
         stateQueue.sync(flags: .barrier) { _onStatusChange = handler }
         return self
     }
-
+    
     @discardableResult
     public func onThreatDetected(_ handler: @escaping (SecurityThreat) -> Void) -> Self {
         stateQueue.sync(flags: .barrier) { _onThreatDetected = handler }
         return self
     }
-
+    
     @discardableResult
     public func onThreatEvent(_ handler: @escaping (ThreatEvent) -> Void) -> Self {
         stateQueue.sync(flags: .barrier) { _onThreatEvent = handler }
         return self
     }
-
+    
     // MARK: - Countermeasures
-
+    
     @discardableResult
     public func addCountermeasure(_ countermeasure: Countermeasure) -> Self {
         if case .threat(let t) = countermeasure.trigger, t.rawValue == "noThreat" {
@@ -201,53 +205,97 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         stateQueue.sync(flags: .barrier) { _countermeasures.append(countermeasure) }
         return self
     }
-
+    
     @discardableResult
     public func removeCountermeasure(_ countermeasure: Countermeasure) -> Self {
         stateQueue.sync(flags: .barrier) { _countermeasures.removeAll { $0 == countermeasure } }
         return self
     }
-
+    
     public func removeAllCountermeasures() {
         stateQueue.sync(flags: .barrier) { _countermeasures.removeAll() }
     }
-
+    
     // MARK: - Event Sinks
-
+    
     @discardableResult
     public func addEventSink(_ sink: any SecurityEventSink) -> Self {
         stateQueue.sync(flags: .barrier) { _eventSinks[ObjectIdentifier(sink)] = sink }
         return self
     }
-
+    
     @discardableResult
     public func removeEventSink(_ sink: any SecurityEventSink) -> Self {
         stateQueue.sync(flags: .barrier) { _ = _eventSinks.removeValue(forKey: ObjectIdentifier(sink)) }
         return self
     }
-
+    
     public func removeAllEventSinks() {
         stateQueue.sync(flags: .barrier) { _eventSinks.removeAll() }
+    }
+    
+    // MARK: - Check Coalescing
+
+    private let checkLock = NSLock()
+    private var _inFlightCheckGroup: DispatchGroup?
+    private var _lastCheckResult: SecurityResult?
+    private var _lastCheckTime: Date?
+    private var _checkCoalescingWindow: TimeInterval = 0.5
+
+    public var checkCoalescingWindow: TimeInterval {
+        get { checkLock.lock(); defer { checkLock.unlock() }; return _checkCoalescingWindow }
+        set { checkLock.lock(); _checkCoalescingWindow = max(newValue, 0); checkLock.unlock() }
     }
 
     // MARK: - Check Methods
 
-    /// Runs all enabled detectors synchronously and returns the result.
     @discardableResult
     public func performCheck() -> SecurityResult {
-        let result = gatherThreats()
-        let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
-        let events = firePending(pending, evidence: result.evidence)
-        fireEventSinks(result: result, statusChange: pending.statusChange, events: events)
-        return result
+        executeCheckCycle()
     }
 
     public var isSecure: Bool {
         return performCheck().isSecure
     }
 
-    // MARK: - Async
+    @discardableResult
+    private func executeCheckCycle() -> SecurityResult {
+        checkLock.lock()
+        if let cached = _lastCheckResult, let time = _lastCheckTime,
+           Date().timeIntervalSince(time) < _checkCoalescingWindow {
+            checkLock.unlock()
+            return cached
+        }
+        if let group = _inFlightCheckGroup {
+            checkLock.unlock()
+            group.wait()
+            checkLock.lock()
+            let result = _lastCheckResult ?? SecurityResult(threats: [], evidence: [:])
+            checkLock.unlock()
+            return result
+        }
+        let group = DispatchGroup()
+        group.enter()
+        _inFlightCheckGroup = group
+        checkLock.unlock()
 
+        let result = gatherThreats()
+        let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
+        let events = firePending(pending, evidence: result.evidence)
+        fireEventSinks(result: result, statusChange: pending.statusChange, events: events)
+
+        checkLock.lock()
+        _lastCheckResult = result
+        _lastCheckTime = Date()
+        _inFlightCheckGroup = nil
+        checkLock.unlock()
+
+        group.leave()
+        return result
+    }
+    
+    // MARK: - Async
+    
     @available(iOS 15.0, *)
     public func performCheckAsync() async -> SecurityResult {
         await withCheckedContinuation { continuation in
@@ -261,12 +309,12 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
     }
-
+    
     @available(iOS 15.0, *)
     public func isSecureAsync() async -> Bool {
         await performCheckAsync().isSecure
     }
-
+    
     // MARK: - AsyncStream
     @available(iOS 15.0, *)
     public var threatEvents: AsyncStream<ThreatEvent> {
@@ -282,7 +330,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
     }
-
+    
     @available(iOS 15.0, *)
     public var statusUpdates: AsyncStream<SecurityStatus> {
         let id = UUID()
@@ -297,9 +345,9 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
     }
-
+    
     // MARK: - Monitoring
-
+    
     public func startMonitoring() {
         let alreadyRunning = stateQueue.sync(flags: .barrier) { () -> Bool in
             if isMonitoring { return true }
@@ -307,34 +355,38 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             return false
         }
         guard !alreadyRunning else { return }
-
+        
 #if !DEBUG
         if stateQueue.sync(execute: { configuration.debuggerCheckEnabled }) {
             DebuggerDetector.startContinuousDenyAttach()
         }
 #endif
-
+        
         if stateQueue.sync(execute: { configuration.screenshotDetectionEnabled }) {
             ScreenshotDetector.startObserving()
         }
-
+        
         if stateQueue.sync(execute: { configuration.clipboardMonitoringEnabled }) {
             ClipboardMonitor.startObserving()
         }
-
+        
         if stateQueue.sync(execute: { configuration.externalDisplayDetectionEnabled }) {
             ExternalDisplayDetector.startObserving()
         }
-
+        
         if stateQueue.sync(execute: { configuration.keyboardExtensionDetectionEnabled }) {
             KeyboardExtensionMonitor.startObserving()
         }
-
-        // Run an immediate first check so the caller isn't blind for the first interval
-        runChecks()
-        scheduleNextCheck()
+        
+        timerQueue.async { [weak self] in
+            guard let self else { return }
+            self.runChecks()
+            if self.stateQueue.sync(execute: { self.isMonitoring }) {
+                self.scheduleNextCheck()
+            }
+        }
     }
-
+    
     public func stopMonitoring() {
         timerQueue.sync {
             monitoringTimer?.cancel()
@@ -367,14 +419,11 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         ExternalDisplayDetector.stopObserving()
         KeyboardExtensionMonitor.stopObserving()
     }
-
+    
     // MARK: - Private
-
+    
     private func runChecks() {
-        let result = gatherThreats()
-        let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
-        let events = firePending(pending, evidence: result.evidence)
-        fireEventSinks(result: result, statusChange: pending.statusChange, events: events)
+        let result = executeCheckCycle()
 
         let hasThreats = !result.threats.isEmpty
         let (interval, cycles) = stateQueue.sync(flags: .barrier) { () -> (TimeInterval, Int) in
@@ -390,11 +439,11 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         }
         Self.logger.debug("Adaptive interval: \(interval)s (cleanCycles: \(cycles), threats: \(hasThreats))")
     }
-
+    
     /// Schedules the next one-shot check on `timerQueue`.
     private func scheduleNextCheck() {
         let interval = stateQueue.sync { _currentInterval }
-
+        
         let timer = DispatchSource.makeTimerSource(queue: timerQueue)
         timer.schedule(deadline: .now() + interval)
         timer.setEventHandler { [weak self] in
@@ -410,20 +459,20 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             timer.resume()
         }
     }
-
+    
     private static let logger = SecurityLogger.security(subsystem: "SecurityMonitor")
-
+    
     private static let detectorQueue = DispatchQueue(
         label: "com.devicesecuritykit.monitor.detectors",
         qos: .userInitiated,
         attributes: .concurrent
     )
-
+    
     private static let persistenceQueue = DispatchQueue(
         label: "com.devicesecuritykit.monitor.persistence",
         qos: .utility
     )
-
+    
     private func runDetector<T>(name: String,
                                 timeout: TimeInterval,
                                 diagnostics: inout [String: DetectorDiagnostic],
@@ -446,14 +495,14 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         }
         return result
     }
-
+    
     private func gatherThreats() -> SecurityResult {
         let (cfg, provider) = stateQueue.sync { (configuration, _screenRecordingProvider) }
         let timeout = cfg.detectorTimeout
         var threats: [SecurityThreat] = []
         var evidence: [SecurityThreat: [String]] = [:]
         var diagnostics: [String: DetectorDiagnostic] = [:]
-
+        
         if cfg.jailbreakCheckEnabled {
             if runDetector(name: "jailbreak", timeout: timeout, diagnostics: &diagnostics, { JailbreakDetector.isJailbroken() }) == true {
                 threats.append(.jailbreak)
@@ -467,7 +516,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 evidence[.debugger] = results.filter { $0.value }.map { $0.key }
             }
         }
-        #if !DEBUG
+#if !DEBUG
         if cfg.emulatorCheckEnabled {
             if let result = runDetector(name: "emulator", timeout: timeout, diagnostics: &diagnostics, { EmulatorDetector.detectEmulator() }),
                result.isEmulator {
@@ -475,7 +524,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 evidence[.emulator] = result.detectionMethods
             }
         }
-        #endif
+#endif
         if cfg.reverseEngineeringCheckEnabled {
             if runDetector(name: "reverseEngineering", timeout: timeout, diagnostics: &diagnostics, { ReverseEngineeringDetector.isReverseEngineered() }) == true {
                 threats.append(.reverseEngineering)
@@ -581,15 +630,16 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 evidence[.thirdPartyKeyboardActive] = KeyboardExtensionMonitor.collectEvidence()
             }
         }
-
+        
         stateQueue.sync(flags: .barrier) { _lastDetectorDiagnostics = diagnostics }
-
+        
         return SecurityResult(threats: threats, evidence: evidence)
     }
-
+    
     private func applyResult(_ result: SecurityResult) -> (
         statusChange: SecurityStatus?,
-        newThreats: [SecurityThreat],
+        historyThreats: [SecurityThreat],
+        callbackThreats: [SecurityThreat],
         currentThreats: [SecurityThreat],
         detectedAt: Date
     ) {
@@ -599,42 +649,42 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             _status = newStatus
             statusChange = newStatus
         }
-
+        
         let currentThreats = Set(result.threats)
-        let candidateThreats = currentThreats.subtracting(_previousThreats)
+        let historyThreats = currentThreats.subtracting(_previousThreats)
         _previousThreats = currentThreats
         hasPerformedInitialCheck = true
-
+        
         let now = Date()
-        let newThreats = Array(candidateThreats.filter { threat in
+        let callbackThreats = Array(historyThreats.filter { threat in
             guard let last = _lastThreatCallbackTime[threat] else { return true }
             return now.timeIntervalSince(last) >= _threatCallbackThrottleInterval
         })
-        for threat in newThreats {
+        for threat in callbackThreats {
             _lastThreatCallbackTime[threat] = now
         }
-
-        return (statusChange, newThreats, Array(currentThreats), now)
+        
+        return (statusChange, Array(historyThreats), callbackThreats, Array(currentThreats), now)
     }
-
+    
     @discardableResult
     private func firePending(
         _ pending: (
             statusChange: SecurityStatus?,
-            newThreats: [SecurityThreat],
+            historyThreats: [SecurityThreat],
+            callbackThreats: [SecurityThreat],
             currentThreats: [SecurityThreat],
             detectedAt: Date
         ),
         evidence: [SecurityThreat: [String]]
     ) -> [ThreatEvent] {
-        guard pending.statusChange != nil || !pending.newThreats.isEmpty || !pending.currentThreats.isEmpty else { return [] }
-
+        guard pending.statusChange != nil || !pending.historyThreats.isEmpty || !pending.currentThreats.isEmpty else { return [] }
+        
         let (statusHandler, threatHandler, threatEventHandler, countermeasures) = stateQueue.sync {
             (_onStatusChange, _onThreatDetected, _onThreatEvent, _countermeasures)
         }
-
-        // Build ThreatEvents for new threats
-        let events = pending.newThreats.map { threat in
+        
+        let historyEvents = pending.historyThreats.map { threat in
             ThreatEvent(
                 threat: threat,
                 severity: threat.severity,
@@ -642,15 +692,16 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 evidence: evidence[threat] ?? []
             )
         }
-
-        // Record into ring buffer and feed AsyncStream consumers
-        if !events.isEmpty {
+        let historyEventsByThreat = Dictionary(uniqueKeysWithValues: zip(pending.historyThreats, historyEvents))
+        let callbackEvents = pending.callbackThreats.compactMap { historyEventsByThreat[$0] }
+        
+        if !historyEvents.isEmpty {
             let (snapshot, persistenceEnabled) = stateQueue.sync(flags: .barrier) { () -> ([ThreatEvent], Bool) in
-                _threatHistory.append(contentsOf: events)
+                _threatHistory.append(contentsOf: historyEvents)
                 if _threatHistory.count > _threatHistoryMaxSize {
                     _threatHistory.removeFirst(_threatHistory.count - _threatHistoryMaxSize)
                 }
-                for event in events {
+                for event in historyEvents {
                     for continuation in _threatEventContinuations.values {
                         continuation.yield(event)
                     }
@@ -663,7 +714,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 }
             }
         }
-
+        
         if let status = pending.statusChange {
             stateQueue.sync(flags: .barrier) {
                 for continuation in _statusContinuations.values {
@@ -671,28 +722,27 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 }
             }
         }
-
-        guard pending.statusChange != nil || !pending.newThreats.isEmpty || !countermeasures.isEmpty else { return events }
+        
+        guard pending.statusChange != nil || !pending.callbackThreats.isEmpty || !countermeasures.isEmpty else { return historyEvents }
         DispatchQueue.main.async {
-            // Countermeasures fire on main thread so UI work is safe
             for cm in countermeasures {
-                let targets = cm.throttled ? pending.newThreats : pending.currentThreats
+                let targets = cm.throttled ? pending.callbackThreats : pending.currentThreats
                 for threat in targets where cm.matches(threat) {
                     cm.action(threat)
                 }
             }
-
+            
             if let status = pending.statusChange {
                 statusHandler?(status)
             }
-            for (threat, event) in zip(pending.newThreats, events) {
+            for (threat, event) in zip(pending.callbackThreats, callbackEvents) {
                 threatHandler?(threat)
                 threatEventHandler?(event)
             }
         }
-        return events
+        return historyEvents
     }
-
+    
     private func fireEventSinks(result: SecurityResult, statusChange: SecurityStatus?, events: [ThreatEvent]) {
         let sinks = stateQueue.sync { Array(_eventSinks.values) }
         guard !sinks.isEmpty else { return }
@@ -706,10 +756,10 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             for sink in sinks { sink.checkCompleted(result) }
         }
     }
-
+    
     private func mapToStatus(_ result: SecurityResult) -> SecurityStatus {
         if result.isSecure { return .secure }
-
+        
         if result.isJailbroken              { return .jailbroken }
         if result.isReverseEngineered       { return .reverseEngineered }
         if result.isAppIntegrityCompromised { return .appIntegrityCompromised }
@@ -734,7 +784,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         if result.isThirdPartyKeyboardActive { return .thirdPartyKeyboardActive }
         // Low
         if result.isMDMDetected             { return .mdmDetected }
-
+        
         return .compromised
     }
 }

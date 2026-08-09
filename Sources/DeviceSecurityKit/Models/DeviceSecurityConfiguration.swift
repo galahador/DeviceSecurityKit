@@ -147,7 +147,23 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         debuggerCheckEnabled: false,
         emulatorCheckEnabled: false,
         reverseEngineeringCheckEnabled: false,
-        appIntegrityCheckEnabled: false
+        appIntegrityCheckEnabled: false,
+        screenRecordingCheckEnabled: false,
+        hookDetectionEnabled: false,
+        pinningBypassDetectionEnabled: false,
+        vpnProxyDetectionEnabled: false,
+        swizzlingDetectionEnabled: false,
+        fridaDetectionEnabled: false,
+        fridaPortScanEnabled: false,
+        attestationCheckEnabled: false,
+        antiRepackagingEnabled: false,
+        screenshotDetectionEnabled: false,
+        dylibInjectionDetectionEnabled: false,
+        threatHistoryPersistenceEnabled: false,
+        mdmDetectionEnabled: false,
+        clipboardMonitoringEnabled: false,
+        externalDisplayDetectionEnabled: false,
+        keyboardExtensionDetectionEnabled: false
     )
     
     // MARK: - Builder Pattern
