@@ -25,6 +25,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public var fridaPortScanEnabled: Bool
     public var fridaPorts: [UInt16]
     public var attestationCheckEnabled: Bool
+    public var attestationPersistenceEnabled: Bool
     public var antiRepackagingEnabled: Bool
     public var expectedCertificateHash: String?
     public var screenshotDetectionEnabled: Bool
@@ -35,7 +36,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     public var clipboardMonitoringEnabled: Bool
     public var externalDisplayDetectionEnabled: Bool
     public var keyboardExtensionDetectionEnabled: Bool
-
+    
     public init(
         jailbreakCheckEnabled: Bool = true,
         debuggerCheckEnabled: Bool = true,
@@ -54,6 +55,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         fridaPortScanEnabled: Bool = true,
         fridaPorts: [UInt16] = FridaDetector.defaultPorts,
         attestationCheckEnabled: Bool = false,
+        attestationPersistenceEnabled: Bool = false,
         antiRepackagingEnabled: Bool = false,
         expectedCertificateHash: String? = nil,
         screenshotDetectionEnabled: Bool = false,
@@ -82,6 +84,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         self.fridaPortScanEnabled = fridaPortScanEnabled
         self.fridaPorts = fridaPorts
         self.attestationCheckEnabled = attestationCheckEnabled
+        self.attestationPersistenceEnabled = attestationPersistenceEnabled
         self.antiRepackagingEnabled = antiRepackagingEnabled
         self.expectedCertificateHash = expectedCertificateHash
         self.screenshotDetectionEnabled = screenshotDetectionEnabled
@@ -141,7 +144,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         screenshotDetectionEnabled: false,
         dylibInjectionDetectionEnabled: false
     )
-
+    
     public static let disabled = DeviceSecurityConfiguration(
         jailbreakCheckEnabled: false,
         debuggerCheckEnabled: false,
@@ -156,6 +159,7 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         fridaDetectionEnabled: false,
         fridaPortScanEnabled: false,
         attestationCheckEnabled: false,
+        attestationPersistenceEnabled: false,
         antiRepackagingEnabled: false,
         screenshotDetectionEnabled: false,
         dylibInjectionDetectionEnabled: false,
@@ -191,25 +195,25 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         config.reverseEngineeringCheckEnabled = enabled
         return config
     }
-
+    
     public func withScreenRecordingCheck(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.screenRecordingCheckEnabled = enabled
         return config
     }
-
+    
     public func withHookDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.hookDetectionEnabled = enabled
         return config
     }
-
+    
     public func withPinningBypassDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.pinningBypassDetectionEnabled = enabled
         return config
     }
-
+    
     public func withVPNProxyDetection(_ enabled: Bool, allowedBundleIDs: [String]? = nil) -> DeviceSecurityConfiguration {
         var config = self
         config.vpnProxyDetectionEnabled = enabled
@@ -218,25 +222,23 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         }
         return config
     }
-
+    
     public func withAppIntegrityCheck(_ enabled: Bool, expectedTeamID: String? = nil) -> DeviceSecurityConfiguration {
         var config = self
         config.appIntegrityCheckEnabled = enabled
         config.expectedTeamID = expectedTeamID
         return config
     }
-
+    
     public func withSwizzlingDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.swizzlingDetectionEnabled = enabled
         return config
     }
-
-    public func withFridaDetection(
-        _ enabled: Bool,
-        portScanEnabled: Bool? = nil,
-        customPorts: [UInt16]? = nil
-    ) -> DeviceSecurityConfiguration {
+    
+    public func withFridaDetection(_ enabled: Bool,
+                                   portScanEnabled: Bool? = nil,
+                                   customPorts: [UInt16]? = nil) -> DeviceSecurityConfiguration {
         var config = self
         config.fridaDetectionEnabled = enabled
         if let portScan = portScanEnabled {
@@ -247,79 +249,81 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         }
         return config
     }
-
+    
     public func withAttestationCheck(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.attestationCheckEnabled = enabled
         return config
     }
-
-    public func withAntiRepackagingCheck(_ enabled: Bool, expectedCertificateHash: String? = nil) -> DeviceSecurityConfiguration {
+    
+    public func withAttestationPersistence(_ enabled: Bool) -> DeviceSecurityConfiguration {
+        var config = self
+        config.attestationPersistenceEnabled = enabled
+        return config
+    }
+    
+    public func withAntiRepackagingCheck(_ enabled: Bool,
+                                         expectedCertificateHash: String? = nil) -> DeviceSecurityConfiguration {
         var config = self
         config.antiRepackagingEnabled = enabled
         config.expectedCertificateHash = expectedCertificateHash
         return config
     }
-
+    
     public func withScreenshotDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.screenshotDetectionEnabled = enabled
         return config
     }
-
+    
     public func withDylibInjectionDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.dylibInjectionDetectionEnabled = enabled
         return config
     }
-
+    
     public func withDetectorTimeout(_ timeout: TimeInterval) -> DeviceSecurityConfiguration {
         var config = self
         config.detectorTimeout = timeout
         return config
     }
-
+    
     public func withExpectedTeamID(_ teamID: String?) -> DeviceSecurityConfiguration {
         var config = self
         config.expectedTeamID = teamID
         return config
     }
-
+    
     public func withExpectedFileHashes(_ hashes: [String: String]) -> DeviceSecurityConfiguration {
         var config = self
         config.expectedFileHashes = hashes
         return config
     }
-
-    /// Persists `threatHistory` to the Keychain so it survives app relaunch (and
-    /// app deletion, since Keychain items can outlive the app on iOS).
+    
     public func withThreatHistoryPersistence(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.threatHistoryPersistenceEnabled = enabled
         return config
     }
-
-    /// Flags devices/apps running under an enterprise MDM configuration
+    
     public func withMDMDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.mdmDetectionEnabled = enabled
         return config
     }
-
-    /// Watches for the pasteboard changing
+    
     public func withClipboardMonitoring(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.clipboardMonitoringEnabled = enabled
         return config
     }
-
-    /// Flags when an external display (AirPlay mirroring, wired/wireless monitor) is connected
+    
     public func withExternalDisplayDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.externalDisplayDetectionEnabled = enabled
         return config
     }
-
+    
     public func withKeyboardExtensionDetection(_ enabled: Bool) -> DeviceSecurityConfiguration {
         var config = self
         config.keyboardExtensionDetectionEnabled = enabled

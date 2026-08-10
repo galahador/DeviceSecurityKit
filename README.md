@@ -104,7 +104,8 @@ dependencies: [
 
 ---
 
-## 🎯 Usage
+<details>
+<summary><h2>🎯 Usage</h2></summary>
 
 ### Configure
 
@@ -257,8 +258,6 @@ Inject any `DSKReportSigning` conformer — useful for tests, App Attest-backed 
 let report = try DSK.shared.signedCheck(using: myCustomSigner)
 ```
 
----
-
 ### Threat History
 
 DSK keeps a ring buffer of recent `ThreatEvent`s so you can inspect detections after the fact:
@@ -317,6 +316,8 @@ struct ContentView: View {
 }
 ```
 
+</details>
+
 ---
 
 ## 🚨 Responding To Threats
@@ -352,7 +353,8 @@ DSK.shared
 
 ---
 
-## ⚙️ Configuration
+<details>
+<summary><h2>⚙️ Configuration</h2></summary>
 
 ### Presets
 
@@ -444,8 +446,6 @@ sensitive field is marked active, DSK reports
 `SecurityThreat.thirdPartyKeyboardActive`. The detection is time-boxed by
 `KeyboardExtensionMonitor.detectionWindowSeconds` (default: 10s).
 
----
-
 ### Concurrent Threats
 
 `status` collapses to the single worst-severity threat, but DSK actually tracks
@@ -460,6 +460,8 @@ if active.contains(.jailbreak) && active.contains(.screenRecording) {
 ```
 
 In SwiftUI, `DSKObservable.activeThreats` publishes the same set reactively.
+
+</details>
 
 ---
 
@@ -487,7 +489,8 @@ print(
 
 ---
 
-## 🔄 Signature Updates
+<details>
+<summary><h2>🔄 Signature Updates</h2></summary>
 
 `SignatureUpdateManager` extends DSK's built-in detection lists (jailbreak paths, debugger process names, reverse-engineering libraries, etc.) with additional entries from a remotely-distributed, Ed25519-signed manifest. Detectors append these entries to their static lists, so you can react to newly-discovered jailbreak tools or hooking frameworks without shipping an app update.
 
@@ -505,6 +508,8 @@ print(SignatureUpdateManager.shared.entries(for: .jailbreakPaths))
 
 The manifest is a signed envelope (`payload` + `signature`); `update(from:)` verifies the signature against the configured public key before applying or caching it. An invalid signature throws `SignatureUpdateError.invalidSignature`, and calling `update(from:)` before `configure(publicKey:)` throws `.notConfigured`. The most recently verified manifest is cached on disk and reloaded automatically the next time `configure(publicKey:)` is called.
 
+</details>
+
 ---
 
 ## 🌐 VPN Allowlist
@@ -521,7 +526,8 @@ The manifest is a signed envelope (`payload` + `signature`); `update(from:)` ver
 
 ---
 
-## ⏱️ Monitoring Interval
+<details>
+<summary><h2>⏱️ Monitoring Interval</h2></summary>
 
 ```swift
 DSK.shared
@@ -590,9 +596,12 @@ Add the identifier to your `Info.plist`:
 </array>
 ```
 
+</details>
+
 ---
 
-## 🎯 Countermeasures
+<details>
+<summary><h2>🎯 Countermeasures</h2></summary>
 
 Countermeasures are automatic actions that fire when a threat is detected.
 
@@ -646,9 +655,12 @@ DSK.shared.removeAllCountermeasures()
 
 > Throttled countermeasures execute once every 300 seconds per threat type. Adjust with `.threatCallbackThrottleInterval(_:)`.
 
+</details>
+
 ---
 
-## 🔔 Event Sinks
+<details>
+<summary><h2>🔔 Event Sinks</h2></summary>
 
 For observers that outlive a single closure (e.g. an analytics or logging object), conform to `SecurityEventSink` instead of using the callback-based handlers:
 
@@ -696,6 +708,8 @@ DSK.shared
     .screenRecordingProvider(myCustomProvider)
     .start()
 ```
+
+</details>
 
 ---
 
@@ -787,6 +801,7 @@ All user-facing strings — `SecurityThreat.description`, `ThreatSeverity.descri
 | Swift | 5.9+ |
 | Xcode | 15.0+ |
 
+visionOS support omits detectors tied to concepts that don't exist there: `ExternalDisplayDetector.isExternalDisplayConnected()` and the default `ScreenRecordingProvider` both return `false` (no `UIScreen`/discrete-display concept). Everything else — jailbreak, debugger, Frida, hook, integrity, attestation, clipboard, keyboard-extension, etc. — behaves the same as on iOS.
 
 ---
 

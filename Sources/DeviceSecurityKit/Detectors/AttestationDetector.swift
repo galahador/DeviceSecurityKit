@@ -20,18 +20,31 @@ public final class AttestationDetector {
         label: "com.devicesecuritykit.attestation.state",
         attributes: .concurrent
     )
+    private static let persistenceQueue = DispatchQueue(
+        label: "com.devicesecuritykit.attestation.persistence"
+    )
     private static var _hasAttempted = false
     private static var _hasFailed    = false
+    private static var _persistenceEnabled = false
+
+    public static var persistenceEnabled: Bool {
+        get { stateQueue.sync { _persistenceEnabled } }
+        set {
+            let shouldLoad = stateQueue.sync(flags: .barrier) { () -> Bool in
+                let wasEnabled = _persistenceEnabled
+                _persistenceEnabled = newValue
+                return newValue && !wasEnabled && !_hasAttempted
+            }
+            guard shouldLoad, let persisted = AttestationStateStore.shared.load() else { return }
+            stateQueue.sync(flags: .barrier) {
+                _hasAttempted = persisted.hasAttempted
+                _hasFailed    = persisted.hasFailed
+            }
+        }
+    }
 
     // MARK: - Public – synchronous check (reads cached state)
 
-    /// Returns `true` only when attestation has been attempted **and** failed.
-    /// Returns `false` when no attempt has been made yet — use `hasAttempted`
-    /// to distinguish "not yet checked" from "checked and passed".
-    /// **Important:** A local attestation success does not guarantee device
-    /// integrity. You must send the attestation object to your server and call
-    /// `markAttestationSucceeded()` or `markAttestationFailed()` based on the
-    /// server's response.
     public static func isAttestationFailed() -> Bool {
 #if os(iOS)
         guard DCAppAttestService.shared.isSupported else { return false }
@@ -41,10 +54,6 @@ public final class AttestationDetector {
 #endif
     }
 
-    /// Whether `attest(challengeHash:completion:)` or one of the
-    /// `markAttestation…` methods has been called at least once.
-    /// When `false`, `isAttestationFailed()` will also be `false` —
-    /// meaning the device has **not** been validated, not that it passed.
     public static var hasAttempted: Bool {
         stateQueue.sync { _hasAttempted }
     }
@@ -89,10 +98,7 @@ public final class AttestationDetector {
                 }
                 // Local attestation succeeded; server must still validate before marking clean.
                 logger.info("App Attest key attestation succeeded — send to server for validation")
-                stateQueue.sync(flags: .barrier) {
-                    _hasAttempted = true
-                    _hasFailed    = false
-                }
+                updateState(attempted: true, failed: false)
                 completion(.success(attestation))
             }
         }
@@ -115,10 +121,7 @@ public final class AttestationDetector {
     // MARK: - Public – server-side outcome recording
 
     public static func markAttestationSucceeded() {
-        stateQueue.sync(flags: .barrier) {
-            _hasAttempted = true
-            _hasFailed    = false
-        }
+        updateState(attempted: true, failed: false)
         logger.info("Attestation marked as succeeded")
     }
 
@@ -128,18 +131,35 @@ public final class AttestationDetector {
     }
 
     public static func reset() {
-        stateQueue.sync(flags: .barrier) {
+        let persist = stateQueue.sync(flags: .barrier) { () -> Bool in
             _hasAttempted = false
             _hasFailed    = false
+            return _persistenceEnabled
+        }
+        if persist {
+            persistenceQueue.async {
+                AttestationStateStore.shared.clear()
+            }
         }
     }
 
     // MARK: - Private
 
     private static func recordFailure() {
-        stateQueue.sync(flags: .barrier) {
-            _hasAttempted = true
-            _hasFailed    = true
+        updateState(attempted: true, failed: true)
+    }
+
+    /// Updates in-memory verdict state and, if `persistenceEnabled`, mirrors it to the Keychain.
+    private static func updateState(attempted: Bool, failed: Bool) {
+        let persist = stateQueue.sync(flags: .barrier) { () -> Bool in
+            _hasAttempted = attempted
+            _hasFailed    = failed
+            return _persistenceEnabled
+        }
+        if persist {
+            persistenceQueue.async {
+                AttestationStateStore.shared.save(.init(hasAttempted: attempted, hasFailed: failed))
+            }
         }
     }
 }

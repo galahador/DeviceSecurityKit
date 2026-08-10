@@ -141,8 +141,9 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 }
             }
         }
+        AttestationDetector.persistenceEnabled = configuration.attestationPersistenceEnabled
     }
-    
+
     deinit {
         stopMonitoring()
     }
@@ -166,12 +167,13 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
                 }
             }
         }
-        
+        AttestationDetector.persistenceEnabled = configuration.attestationPersistenceEnabled
+
         if stateQueue.sync(execute: { isMonitoring }) {
             runChecks()
         }
     }
-    
+
     public func currentConfiguration() -> DeviceSecurityConfiguration {
         stateQueue.sync { configuration }
     }
