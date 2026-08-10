@@ -55,22 +55,6 @@
 
 ---
 <details>
-<summary><h2>⚡ Quick Start</h2></summary>
-## 
-
-```swift
-import DeviceSecurityKit
-
-DSK.shared
-    .configure(.production)
-    .onThreatDetected { threat in
-        print("Threat: \(threat.description)")
-    }
-    .start()
-```
-</details>
-
-<details>
 <summary><h2>📦 Installation</h2></summary>
 
 
@@ -102,6 +86,21 @@ dependencies: [
         from: "0.40.0"
     )
 ]
+```
+</details>
+<details>
+<summary><h2>⚡ Quick Start</h2></summary>
+## 
+
+```swift
+import DeviceSecurityKit
+
+DSK.shared
+    .configure(.production)
+    .onThreatDetected { threat in
+        print("Threat: \(threat.description)")
+    }
+    .start()
 ```
 </details>
 
