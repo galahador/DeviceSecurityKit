@@ -8,7 +8,6 @@
 import Foundation
 import UIKit
 
-/// Detects an external display connection (AirPlay screen mirroring, wired/wireless external monitors)
 internal final class ExternalDisplayDetector {
 
     private static let logger = SecurityLogger.security(subsystem: "ExternalDisplayDetector")
@@ -17,10 +16,12 @@ internal final class ExternalDisplayDetector {
     private static var _isObserving = false
 
     // MARK: - Public
-
-    /// Returns true if any screen besides `UIScreen.main` is currently connected to AirPlay mirroring
     static func isExternalDisplayConnected() -> Bool {
+#if os(iOS)
         return UIScreen.screens.count > 1
+#else
+        return false
+#endif
     }
 
     static func collectEvidence() -> [String] {
@@ -28,6 +29,7 @@ internal final class ExternalDisplayDetector {
     }
 
     static func startObserving() {
+#if os(iOS)
         let alreadyObserving = stateQueue.sync(flags: .barrier) { () -> Bool in
             if _isObserving { return true }
             _isObserving = true
@@ -47,23 +49,28 @@ internal final class ExternalDisplayDetector {
             name: UIScreen.didDisconnectNotification,
             object: nil
         )
+#endif
     }
 
     /// Stops observing.
     static func stopObserving() {
+#if os(iOS)
         stateQueue.sync(flags: .barrier) {
             _isObserving = false
         }
 
         NotificationCenter.default.removeObserver(self, name: UIScreen.didConnectNotification, object: nil)
         NotificationCenter.default.removeObserver(self, name: UIScreen.didDisconnectNotification, object: nil)
+#endif
     }
 
     // MARK: - Private
 
+#if os(iOS)
     @objc private static func handleScreenChange() {
         if isExternalDisplayConnected() {
             logger.warning("External display connected — possible AirPlay/screen mirroring")
         }
     }
+#endif
 }

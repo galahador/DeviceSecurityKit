@@ -5,7 +5,8 @@ let package = Package(
     name: "DeviceSecurityKit",
     platforms: [
         .iOS(.v15),
-        .macOS(.v13)
+        .macOS(.v13),
+        .visionOS(.v1)
     ],
     products: [
         .library(
