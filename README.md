@@ -54,8 +54,9 @@
 | 🔏 Signed Reports | Tamper-evident `SignedSecurityReport` with Secure Enclave-backed ECDSA signing — backends can verify reports weren't forged or replayed client-side |
 
 ---
-
-## ⚡ Quick Start
+<details>
+<summary><h2>⚡ Quick Start</h2></summary>
+## 
 
 ```swift
 import DeviceSecurityKit
@@ -67,10 +68,11 @@ DSK.shared
     }
     .start()
 ```
+</details>
 
----
+<details>
+<summary><h2>📦 Installation</h2></summary>
 
-## 📦 Installation
 
 ### Swift Package Manager
 
@@ -101,8 +103,7 @@ dependencies: [
     )
 ]
 ```
-
----
+</details>
 
 <details>
 <summary><h2>🎯 Usage</h2></summary>
@@ -318,9 +319,8 @@ struct ContentView: View {
 
 </details>
 
----
-
-## 🚨 Responding To Threats
+<details>
+<summary><h2>🚨 Responding To Threats</h2></summary>
 
 ```swift
 DSK.shared
@@ -350,8 +350,7 @@ DSK.shared
     }
     .start()
 ```
-
----
+</details>
 
 <details>
 <summary><h2>⚙️ Configuration</h2></summary>
@@ -463,9 +462,8 @@ In SwiftUI, `DSKObservable.activeThreats` publishes the same set reactively.
 
 </details>
 
----
-
-## 🔒 Anti-Repackaging
+<details>
+<summary><h2>🔒 Anti-Repackaging</h2></summary>
 
 ### Obtain Your Certificate Hash
 
@@ -486,8 +484,7 @@ print(
     "your-hash-here"
 )
 ```
-
----
+</details>
 
 <details>
 <summary><h2>🔄 Signature Updates</h2></summary>
@@ -510,9 +507,8 @@ The manifest is a signed envelope (`payload` + `signature`); `update(from:)` ver
 
 </details>
 
----
-
-## 🌐 VPN Allowlist
+<details>
+<summary><h2>🌐 VPN Allowlist</h2></summary>
 
 ```swift
 .withVPNProxyDetection(
@@ -523,8 +519,7 @@ The manifest is a signed envelope (`payload` + `signature`); `update(from:)` ver
     ]
 )
 ```
-
----
+</details>
 
 <details>
 <summary><h2>⏱️ Monitoring Interval</h2></summary>
@@ -598,8 +593,6 @@ Add the identifier to your `Info.plist`:
 
 </details>
 
----
-
 <details>
 <summary><h2>🎯 Countermeasures</h2></summary>
 
@@ -657,8 +650,6 @@ DSK.shared.removeAllCountermeasures()
 
 </details>
 
----
-
 <details>
 <summary><h2>🔔 Event Sinks</h2></summary>
 
@@ -710,8 +701,6 @@ DSK.shared
 ```
 
 </details>
-
----
 
 ## 📊 Threat Severity
 
