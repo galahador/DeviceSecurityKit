@@ -16,6 +16,10 @@ public struct DefaultScreenRecordingProvider: ScreenRecordingProvider, Sendable 
     public init() {}
 
     public func isScreenBeingRecorded() -> Bool {
+#if os(iOS)
         return UIScreen.main.isCaptured
+#else
+        return false
+#endif
     }
 }

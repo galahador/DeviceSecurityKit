@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>Lightweight iOS Security Detection Framework</strong>
+  <strong>Lightweight iOS &amp; visionOS Security Detection Framework</strong>
 </p>
 
 <p align="center">
@@ -16,6 +16,7 @@
 
 ![Swift](https://img.shields.io/badge/Swift-5.9+-F05138?style=for-the-badge&logo=swift&logoColor=white)
 ![iOS](https://img.shields.io/badge/iOS-15.0+-000000?style=for-the-badge&logo=apple&logoColor=white)
+![visionOS](https://img.shields.io/badge/visionOS-1.0+-000000?style=for-the-badge&logo=apple&logoColor=white)
 ![SPM](https://img.shields.io/badge/SPM-Compatible-4BC51D?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
@@ -47,6 +48,8 @@
 | 🏢 MDM Detection | Flags devices running under an enterprise Managed App Configuration |
 | 📋 Clipboard Monitoring | Detects unexpected pasteboard changes after the app copies sensitive data |
 | 🖥️ External Display Detection | Flags AirPlay screen mirroring or external/wired monitor connections |
+| ⌨️ Keyboard Extension Detection | Flags third-party keyboards active while a sensitive field (password, OTP, payment) is being edited |
+| 🎯 Concurrent Threat Tracking | `currentThreats` exposes every threat active right now, not just the most severe one |
 | 🌍 Localization | All user-facing strings (threat/status/severity descriptions, reports) ship via a String Catalog and adapt to the device's locale |
 | 🔏 Signed Reports | Tamper-evident `SignedSecurityReport` with Secure Enclave-backed ECDSA signing — backends can verify reports weren't forged or replayed client-side |
 
@@ -173,6 +176,16 @@ Task {
 ```
 
 Multiple consumers can subscribe independently. The stream ends when `stop()` is called or the consuming `Task` is cancelled.
+
+There's an equivalent stream for status transitions:
+
+```swift
+Task {
+    for await status in DSK.shared.statusUpdates {
+        print("Status changed to \(status)")
+    }
+}
+```
 
 ### Signed Threat Reports
 
@@ -382,6 +395,7 @@ let config = DeviceSecurityConfiguration.default
     .withMDMDetection(true)
     .withClipboardMonitoring(true)
     .withExternalDisplayDetection(true)
+    .withKeyboardExtensionDetection(true)
 
 DSK.shared
     .configure(config)
@@ -409,6 +423,43 @@ When `withExternalDisplayDetection(true)` is enabled, DSK checks
 external/wired monitor. If a second screen is present, DSK reports
 `SecurityThreat.externalDisplayConnected` — useful for hiding sensitive content
 (e.g. with `secureScreen(dsk:)`) while the device's screen is being mirrored.
+Not applicable on visionOS, which has no discrete external-display concept —
+`isExternalDisplayConnected()` always returns `false` there.
+
+### Keyboard Extension Detection
+
+When `withKeyboardExtensionDetection(true)` is enabled, mark sensitive fields as
+they become active so DSK can flag a third-party keyboard typing into them:
+
+```swift
+textField.becomeFirstResponder()
+KeyboardExtensionMonitor.markSensitiveFieldActive(textField)
+
+// When editing ends:
+KeyboardExtensionMonitor.markSensitiveFieldInactive()
+```
+
+If the active input mode isn't one of Apple's own (`com.apple.*`) while a
+sensitive field is marked active, DSK reports
+`SecurityThreat.thirdPartyKeyboardActive`. The detection is time-boxed by
+`KeyboardExtensionMonitor.detectionWindowSeconds` (default: 10s).
+
+---
+
+### Concurrent Threats
+
+`status` collapses to the single worst-severity threat, but DSK actually tracks
+every threat that's active at once:
+
+```swift
+let active = DSK.shared.currentThreats // Set<SecurityThreat>
+
+if active.contains(.jailbreak) && active.contains(.screenRecording) {
+    // both conditions are true concurrently, not just the highest-severity one
+}
+```
+
+In SwiftUI, `DSKObservable.activeThreats` publishes the same set reactively.
 
 ---
 
@@ -501,6 +552,18 @@ Query the current adaptive interval at any time:
 let current = DSK.shared.currentMonitoringInterval
 ```
 
+### Check Coalescing
+
+Rapid or concurrent calls to `performCheck()` / `isSecure` (e.g. from several
+call sites within milliseconds of each other) are coalesced into a single
+detector sweep instead of each triggering a full ~20-detector pass:
+
+```swift
+DSK.shared
+    .checkCoalescingWindow(0.5) // default: 0.5s
+    .start()
+```
+
 ### Background Monitoring (BGTaskScheduler)
 
 DSK can run a security check while the app is suspended, via `BGAppRefreshTask`:
@@ -511,10 +574,12 @@ let identifier = "com.example.app.dsk-refresh"
 DSK.shared
     .registerBackgroundTask(identifier: identifier)
 
-DSK.shared.scheduleBackgroundCheck(identifier: identifier)
+let submitted = DSK.shared.scheduleBackgroundCheck(identifier: identifier)
 ```
 
 `registerBackgroundTask(identifier:)` should be called during app launch (before `applicationDidFinishLaunching` returns). Each run automatically reschedules the next check and calls `performCheckAsync()`.
+
+`scheduleBackgroundCheck(identifier:earliestBeginDate:)` returns `@discardableResult Bool` — `false` if `BGTaskScheduler` rejected the submission (e.g. too many pending requests), which is also logged via `SecurityLogger`.
 
 Add the identifier to your `Info.plist`:
 
@@ -583,6 +648,57 @@ DSK.shared.removeAllCountermeasures()
 
 ---
 
+## 🔔 Event Sinks
+
+For observers that outlive a single closure (e.g. an analytics or logging object), conform to `SecurityEventSink` instead of using the callback-based handlers:
+
+```swift
+final class SecurityAuditLogger: SecurityEventSink {
+    func threatDetected(_ event: ThreatEvent) {
+        AuditLog.record(event)
+    }
+
+    func statusChanged(to status: SecurityStatus) {
+        AuditLog.record(status)
+    }
+
+    func checkCompleted(_ result: SecurityResult) {
+        AuditLog.record(result.riskScore, result.riskLevel)
+    }
+}
+
+let sink = SecurityAuditLogger()
+DSK.shared.addEventSink(sink)
+
+// Later:
+DSK.shared.removeEventSink(sink)
+DSK.shared.removeAllEventSinks()
+```
+
+`statusChanged(to:)` and `checkCompleted(_:)` have default no-op implementations, so a sink only needs to implement `threatDetected(_:)`.
+
+### Detector Diagnostics
+
+Inspect per-detector timing and timeout information from the most recent check:
+
+```swift
+for (name, diagnostic) in DSK.shared.lastDetectorDiagnostics {
+    print("\(name): \(diagnostic.duration)s, timedOut: \(diagnostic.timedOut)")
+}
+```
+
+### Custom Screen Recording Provider
+
+`isScreenBeingRecorded()` is backed by `UIScreen.main.isCaptured` on iOS by default (always `false` on visionOS, which has no `UIScreen`). Inject your own `ScreenRecordingProvider` conformer for testing or custom logic:
+
+```swift
+DSK.shared
+    .screenRecordingProvider(myCustomProvider)
+    .start()
+```
+
+---
+
 ## 📊 Threat Severity
 
 | Severity | Meaning |
@@ -633,6 +749,7 @@ DSK.shared.removeAllCountermeasures()
 | MDM / Enterprise Management | 🟢 Low |
 | Clipboard Exfiltration | 🟡 Medium |
 | External Display Connected | 🟡 Medium |
+| Third-Party Keyboard Active | 🟡 Medium |
 
 ---
 
@@ -666,8 +783,10 @@ All user-facing strings — `SecurityThreat.description`, `ThreatSeverity.descri
 | Requirement | Version |
 |-------------|----------|
 | iOS | 15.0+ |
+| visionOS | 1.0+ |
 | Swift | 5.9+ |
 | Xcode | 15.0+ |
+
 
 ---
 
