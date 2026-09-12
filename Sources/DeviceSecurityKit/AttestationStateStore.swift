@@ -63,4 +63,21 @@ internal struct AttestationStateStore {
     internal func clear() {
         SecItemDelete(baseQuery() as CFDictionary)
     }
+
+    internal func isKeychainAvailable() -> Bool {
+        let probeQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true,
+            kSecValueData as String: Data(),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        let status = SecItemAdd(probeQuery as CFDictionary, nil)
+        if status == errSecSuccess {
+            SecItemDelete(baseQuery() as CFDictionary)
+            return true
+        }
+        return status != errSecMissingEntitlement
+    }
 }
