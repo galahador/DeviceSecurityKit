@@ -10,17 +10,15 @@ import UIKit
 
 internal final class ScreenshotDetector {
 
+    // MARK: - Private Properties
     private static let logger = SecurityLogger.security(subsystem: "ScreenshotDetector")
     private static let stateQueue = DispatchQueue(label: "com.devicesecuritykit.screenshot.state", attributes: .concurrent)
-
     private static var _isObserving = false
     private static var _screenshotDetected = false
     private static var _lastScreenshotDate: Date?
     private static var _screenshotWindowSeconds: TimeInterval = 10
 
     // MARK: - Public
-
-    /// Returns true if a screenshot was taken within the configured detection window.
     static func wasScreenshotTaken() -> Bool {
         return stateQueue.sync {
             guard _screenshotDetected, let lastDate = _lastScreenshotDate else { return false }
@@ -31,15 +29,11 @@ internal final class ScreenshotDetector {
         }
     }
 
-    /// How long after a screenshot the detector continues reporting it.
-    /// Default is 10 seconds — covers at least one monitoring cycle at default 60s interval
-    /// but doesn't persist indefinitely.
     static var detectionWindowSeconds: TimeInterval {
         get { stateQueue.sync { _screenshotWindowSeconds } }
         set { stateQueue.sync(flags: .barrier) { _screenshotWindowSeconds = newValue } }
     }
 
-    /// Starts observing for `userDidTakeScreenshotNotification`. Safe to call multiple times.
     static func startObserving() {
         let alreadyObserving = stateQueue.sync(flags: .barrier) { () -> Bool in
             if _isObserving { return true }
@@ -56,7 +50,6 @@ internal final class ScreenshotDetector {
         )
     }
 
-    /// Stops observing and clears detection state.
     static func stopObserving() {
         stateQueue.sync(flags: .barrier) {
             _isObserving = false
@@ -72,7 +65,6 @@ internal final class ScreenshotDetector {
     }
 
     // MARK: - Private
-
     @objc private static func handleScreenshot() {
         logger.warning("Screenshot detected")
         stateQueue.sync(flags: .barrier) {

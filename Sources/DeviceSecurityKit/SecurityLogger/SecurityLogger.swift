@@ -232,10 +232,7 @@ internal extension SecurityLogger {
     static func libraryLogger(for component: String) -> SecurityLogger {
         return SecurityLogger(subsystem: "DeviceSecurityKit", category: component)
     }
-
-    /// Redacts sensitive values in release builds.
-    /// - DEBUG: returns the full value for developer diagnostics
-    /// - RELEASE: returns a short hash prefix so logs remain correlatable without exposing raw data
+    
     static func redact(_ value: String) -> String {
 #if DEBUG
         return value

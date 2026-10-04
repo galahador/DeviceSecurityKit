@@ -46,7 +46,6 @@ public protocol DSKClient: AnyObject {
 
     var currentThreats: Set<SecurityThreat> { get }
 
-    /// Runs all enabled detectors synchronously and returns the result.
     @discardableResult func performCheck() -> SecurityResult
     var isSecure: Bool { get }
     var threatHistory: [ThreatEvent] { get }
@@ -54,7 +53,6 @@ public protocol DSKClient: AnyObject {
     func clearThreatHistory()
     var currentMonitoringInterval: TimeInterval { get }
 
-    /// Timing and timeout information for each detector from the most recent performCheck()
     var lastDetectorDiagnostics: [String: DetectorDiagnostic] { get }
 
     @available(iOS 15.0, *)

@@ -48,7 +48,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     public var status: SecurityStatus {
         stateQueue.sync { _status }
     }
-
+    
     public var currentThreats: Set<SecurityThreat> {
         stateQueue.sync { _previousThreats }
     }
@@ -143,7 +143,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         }
         AttestationDetector.persistenceEnabled = configuration.attestationPersistenceEnabled
     }
-
+    
     deinit {
         stopMonitoring()
     }
@@ -168,12 +168,12 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
             }
         }
         AttestationDetector.persistenceEnabled = configuration.attestationPersistenceEnabled
-
+        
         if stateQueue.sync(execute: { isMonitoring }) {
             runChecks()
         }
     }
-
+    
     public func currentConfiguration() -> DeviceSecurityConfiguration {
         stateQueue.sync { configuration }
     }
@@ -237,29 +237,29 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     }
     
     // MARK: - Check Coalescing
-
+    
     private let checkLock = NSLock()
     private var _inFlightCheckGroup: DispatchGroup?
     private var _lastCheckResult: SecurityResult?
     private var _lastCheckTime: Date?
     private var _checkCoalescingWindow: TimeInterval = 0.5
-
+    
     public var checkCoalescingWindow: TimeInterval {
         get { checkLock.lock(); defer { checkLock.unlock() }; return _checkCoalescingWindow }
         set { checkLock.lock(); _checkCoalescingWindow = max(newValue, 0); checkLock.unlock() }
     }
-
+    
     // MARK: - Check Methods
-
+    
     @discardableResult
     public func performCheck() -> SecurityResult {
         executeCheckCycle()
     }
-
+    
     public var isSecure: Bool {
         return performCheck().isSecure
     }
-
+    
     @discardableResult
     private func executeCheckCycle() -> SecurityResult {
         checkLock.lock()
@@ -280,18 +280,18 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         group.enter()
         _inFlightCheckGroup = group
         checkLock.unlock()
-
+        
         let result = gatherThreats()
         let pending = stateQueue.sync(flags: .barrier) { applyResult(result) }
         let events = firePending(pending, evidence: result.evidence)
         fireEventSinks(result: result, statusChange: pending.statusChange, events: events)
-
+        
         checkLock.lock()
         _lastCheckResult = result
         _lastCheckTime = Date()
         _inFlightCheckGroup = nil
         checkLock.unlock()
-
+        
         group.leave()
         return result
     }
@@ -426,7 +426,7 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
     
     private func runChecks() {
         let result = executeCheckCycle()
-
+        
         let hasThreats = !result.threats.isEmpty
         let (interval, cycles) = stateQueue.sync(flags: .barrier) { () -> (TimeInterval, Int) in
             if hasThreats {
@@ -442,7 +442,6 @@ public final class SecurityMonitor: SecurityMonitorType, @unchecked Sendable {
         Self.logger.debug("Adaptive interval: \(interval)s (cleanCycles: \(cycles), threats: \(hasThreats))")
     }
     
-    /// Schedules the next one-shot check on `timerQueue`.
     private func scheduleNextCheck() {
         let interval = stateQueue.sync { _currentInterval }
         

@@ -11,22 +11,24 @@ import Combine
 @available(iOS 15.0, *)
 @MainActor
 public final class DSKObservable: ObservableObject {
-
+    
+    // MARK: - Public
     @Published public private(set) var status: SecurityStatus
     @Published public private(set) var threatHistory: [ThreatEvent]
     @Published public private(set) var activeThreats: Set<SecurityThreat>
-
+    
+    // MARK: - Private Properties
     private let dsk: DSK
     private var statusTask: Task<Void, Never>?
     private var threatEventTask: Task<Void, Never>?
-
-    /// - Parameter dsk: The `DSK` instance to observe. Defaults to `DSK.shared`.
+    
+    // MARK: - init
     public init(dsk: DSK = .shared) {
         self.dsk = dsk
         self.status = dsk.status
         self.threatHistory = dsk.threatHistory
         self.activeThreats = dsk.currentThreats
-
+        
         statusTask = Task { [weak self] in
             guard let self else { return }
             for await status in dsk.statusUpdates {
@@ -34,7 +36,7 @@ public final class DSKObservable: ObservableObject {
                 self.activeThreats = dsk.currentThreats
             }
         }
-
+        
         threatEventTask = Task { [weak self] in
             guard let self else { return }
             for await _ in dsk.threatEvents {
@@ -43,7 +45,7 @@ public final class DSKObservable: ObservableObject {
             }
         }
     }
-
+    
     deinit {
         statusTask?.cancel()
         threatEventTask?.cancel()

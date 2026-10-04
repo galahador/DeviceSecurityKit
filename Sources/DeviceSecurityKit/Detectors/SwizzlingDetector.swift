@@ -11,35 +11,35 @@ import MachO
 import ObjectiveC
 
 public final class SwizzlingDetector {
-
+    
     private static let logger = SecurityLogger.security(subsystem: "SwizzlingDetector")
     private static let o = StringObfuscator.shared
-
+    
     public static func isSwizzled() -> Bool {
         return checkSystemMethodOrigins()
-            || checkAppClassIntegrity()
-            || checkKnownSwizzlingLibraries()
-            || checkSwiftMetadataIntegrity()
+        || checkAppClassIntegrity()
+        || checkKnownSwizzlingLibraries()
+        || checkSwiftMetadataIntegrity()
     }
-
+    
     // MARK: - Check 1: Method IMP origin
-
+    
     private static func checkSystemMethodOrigins() -> Bool {
         let instanceTargets: [(String, String)] = [
             (
                 o.reveal([0xE7, 0x77, 0x90, 0x81, 0x50, 0x1E, 0xEB, 0x37, 0x74, 0x84, 0x72, 0x78, 0x73, 0xB7, 0x0D, 0x72]),
                 o.reveal([0x4B, 0x47, 0x7A, 0x83, 0x94, 0x1A, 0x08, 0xC6, 0x92, 0x6C, 0x22, 0x62,
-                 0xFD, 0xE3, 0x10, 0x54, 0x75, 0xB7, 0x99, 0xA9, 0x8C, 0x47, 0x60, 0x22,
-                 0x75, 0x4E, 0x58, 0x96, 0xF2, 0x0F, 0xF6, 0x22, 0x4C, 0x9B, 0x5F, 0x6F,
-                 0x81, 0x97, 0x30, 0xDC, 0x37, 0x5B])
+                          0xFD, 0xE3, 0x10, 0x54, 0x75, 0xB7, 0x99, 0xA9, 0x8C, 0x47, 0x60, 0x22,
+                          0x75, 0x4E, 0x58, 0x96, 0xF2, 0x0F, 0xF6, 0x22, 0x4C, 0x9B, 0x5F, 0x6F,
+                          0x81, 0x97, 0x30, 0xDC, 0x37, 0x5B])
             ),
             (
                 o.reveal([0xE3, 0x69, 0xFA, 0x77, 0x08, 0xF0, 0xC7, 0x8D, 0x70, 0x4A, 0x3E, 0x3A, 0xFB, 0x17, 0x6F, 0x9C]),
                 o.reveal([0xB1, 0x6E, 0xFD, 0x5F, 0x96, 0x26, 0x15, 0xAD, 0x60, 0x34, 0x1C, 0x71,
-                 0x56, 0x72, 0xF1, 0xB4, 0x8F, 0xD1, 0xDC, 0x8E, 0x92, 0x1F, 0xE5, 0x08,
-                 0xBE, 0x64, 0x71, 0xFB, 0x67, 0x88, 0x4E, 0x27, 0x1E, 0xFF, 0xC8, 0x7E,
-                 0x23, 0x3E, 0x37, 0xCA, 0x51, 0x99, 0xFA, 0x33, 0x63, 0x50, 0x16, 0xC8,
-                 0x58, 0x93, 0x94, 0xED, 0xA2])
+                          0x56, 0x72, 0xF1, 0xB4, 0x8F, 0xD1, 0xDC, 0x8E, 0x92, 0x1F, 0xE5, 0x08,
+                          0xBE, 0x64, 0x71, 0xFB, 0x67, 0x88, 0x4E, 0x27, 0x1E, 0xFF, 0xC8, 0x7E,
+                          0x23, 0x3E, 0x37, 0xCA, 0x51, 0x99, 0xFA, 0x33, 0x63, 0x50, 0x16, 0xC8,
+                          0x58, 0x93, 0x94, 0xED, 0xA2])
             ),
             (
                 o.reveal([0x64, 0x47, 0xE4, 0x2E, 0x18, 0x49, 0x62, 0x38, 0x03, 0x2E, 0xB9, 0xC5, 0x52, 0x37, 0x7F, 0x00, 0xC3]),
@@ -48,28 +48,28 @@ public final class SwizzlingDetector {
             (
                 o.reveal([0x4B, 0xB3, 0x30, 0x19, 0xAC, 0x82, 0x15, 0xFB, 0xC6, 0x7E, 0xC0, 0x83]),
                 o.reveal([0x7C, 0x22, 0xEF, 0xE1, 0x0F, 0xEA, 0x39, 0x32, 0xC2, 0xFD, 0x9A, 0xE6,
-                 0x87, 0xAB, 0x2E, 0xB1, 0x1C, 0xF5, 0x54, 0xAF, 0x66, 0x45])
+                          0x87, 0xAB, 0x2E, 0xB1, 0x1C, 0xF5, 0x54, 0xAF, 0x66, 0x45])
             ),
             // NSURLSession – dataTaskWithURL:completionHandler:
             (
                 o.reveal([0x9B, 0x20, 0x0B, 0x93, 0x17, 0xE9, 0x62, 0xF4, 0x63, 0xD3, 0x03, 0x3B, 0x90, 0x82, 0x2B, 0x57]),
                 o.reveal([0x7A, 0x81, 0xFB, 0xC7, 0x8A, 0xEA, 0xFC, 0x36, 0x70, 0x30, 0x20, 0xAA,
-                 0x09, 0xA8, 0x3D, 0x55, 0xBD, 0x27, 0xAD, 0x75, 0xDC, 0x97, 0x36, 0xC3,
-                 0x19, 0x49, 0xAA, 0xDC, 0xDA, 0xF7, 0x13, 0xE2, 0xE9, 0x93, 0x7F, 0x57,
-                 0x26, 0xB6])
+                          0x09, 0xA8, 0x3D, 0x55, 0xBD, 0x27, 0xAD, 0x75, 0xDC, 0x97, 0x36, 0xC3,
+                          0x19, 0x49, 0xAA, 0xDC, 0xDA, 0xF7, 0x13, 0xE2, 0xE9, 0x93, 0x7F, 0x57,
+                          0x26, 0xB6])
             ),
             // NSFileManager – fileExistsAtPath: (jailbreak-detection bypass vector)
             (
                 o.reveal([0xE3, 0xBD, 0xAF, 0x8A, 0x11, 0xA5, 0x9D, 0xEB, 0xE9, 0x91, 0x47, 0xB5, 0x29, 0x99, 0x48, 0x59, 0xAA]),
                 o.reveal([0x55, 0x8A, 0xD7, 0x37, 0xC1, 0x3D, 0xC9, 0x5D, 0xC0, 0x36, 0x19, 0x91,
-                 0x55, 0x28, 0x23, 0xC1, 0xB9, 0xC2, 0xFA, 0x2F, 0xA3])
+                          0x55, 0x28, 0x23, 0xC1, 0xB9, 0xC2, 0xFA, 0x2F, 0xA3])
             ),
             // NSFileManager – isReadableFileAtPath: (jailbreak-detection bypass vector)
             (
                 o.reveal([0x8B, 0xC3, 0x71, 0xD0, 0xF5, 0xE3, 0x05, 0x61, 0x19, 0xDF, 0x47, 0x17, 0xAD, 0xA1, 0x96, 0x9F, 0xB6]),
                 o.reveal([0xA0, 0x3F, 0x49, 0x52, 0xD0, 0x20, 0x07, 0x8A, 0xCE, 0xB1, 0x6D, 0xF7,
-                 0x93, 0x0F, 0xA4, 0xF4, 0x64, 0xB7, 0xC3, 0xE9, 0x0E, 0x22, 0xD9, 0xAA,
-                 0x62])
+                          0x93, 0x0F, 0xA4, 0xF4, 0x64, 0xB7, 0xC3, 0xE9, 0x0E, 0x22, 0xD9, 0xAA,
+                          0x62])
             ),
             // UIDevice – model (emulator / device-type detection bypass)
             (
@@ -107,27 +107,27 @@ public final class SwizzlingDetector {
                 o.reveal([0xFE, 0x5E, 0xED, 0x17, 0xF8, 0xD0, 0x6F, 0xA8, 0xC7, 0x82, 0xDC, 0x26, 0x02, 0xF5, 0xC0, 0xB8, 0xB0, 0x45, 0xDC, 0x3D, 0x87, 0x3F, 0xF5, 0xF3, 0xFF, 0xB8, 0xBD, 0x25])
             ),
         ]
-
+        
         for (className, selName) in instanceTargets {
             guard let cls = NSClassFromString(className) else { continue }
             let sel = NSSelectorFromString(selName)
             guard class_getInstanceMethod(cls, sel) != nil else { continue }
             guard let imp = class_getMethodImplementation(cls, sel) else { continue }
-
+            
             if impIsOutsideSystem(imp, label: "\(className).\(selName)") {
                 return true
             }
         }
-
+        
         let connClass = o.reveal([0xE8, 0x32, 0x18, 0xF1, 0xC7, 0x0B, 0x28, 0xAE, 0x37,
-                                   0x21, 0xA5, 0xCC, 0xBF, 0x61, 0x32, 0x18, 0xA9, 0x1F,
-                                   0xE7])
+                                  0x21, 0xA5, 0xCC, 0xBF, 0x61, 0x32, 0x18, 0xA9, 0x1F,
+                                  0xE7])
         let connSel   = o.reveal([0x8A, 0xD9, 0xAE, 0x29, 0x2B, 0x79, 0x76, 0x44, 0x7B,
-                                   0x61, 0x38, 0x1C, 0x73, 0xEC, 0x91, 0x18, 0x97, 0x8B,
-                                   0xC6, 0x14, 0x88, 0x58, 0xFF, 0x65, 0xC0, 0x6D, 0x47,
-                                   0x08, 0x1E, 0x32, 0x5F, 0x6B, 0x70, 0xAE, 0xAC, 0xEA,
-                                   0x41, 0xFD, 0x9B, 0x0C, 0x93, 0x7F, 0x8E, 0x48, 0x94,
-                                   0x3B, 0x83, 0x5A, 0x3E, 0x33, 0xB9, 0x73])
+                                  0x61, 0x38, 0x1C, 0x73, 0xEC, 0x91, 0x18, 0x97, 0x8B,
+                                  0xC6, 0x14, 0x88, 0x58, 0xFF, 0x65, 0xC0, 0x6D, 0x47,
+                                  0x08, 0x1E, 0x32, 0x5F, 0x6B, 0x70, 0xAE, 0xAC, 0xEA,
+                                  0x41, 0xFD, 0x9B, 0x0C, 0x93, 0x7F, 0x8E, 0x48, 0x94,
+                                  0x3B, 0x83, 0x5A, 0x3E, 0x33, 0xB9, 0x73])
         if let cls = NSClassFromString(connClass),
            let metaCls = object_getClass(cls) {
             let sel = NSSelectorFromString(connSel)
@@ -138,10 +138,10 @@ public final class SwizzlingDetector {
                 }
             }
         }
-
+        
         return false
     }
-
+    
     private static func impIsOutsideSystem(
         _ imp: IMP,
         label: String
@@ -159,42 +159,41 @@ public final class SwizzlingDetector {
         }
         return false
     }
-
+    
     // MARK: - Check 2: App class IMP integrity scan
-
+    
     private static func checkAppClassIntegrity() -> Bool {
 #if !targetEnvironment(simulator)
         guard let appImagePath = Bundle.main.executablePath else { return false }
-
+        
         var classCount: UInt32 = 0
         guard let classList = objc_copyClassList(&classCount) else { return false }
         defer { free(UnsafeMutableRawPointer(classList)) }
-
-        // `objc_copyClassList` is imported as `AutoreleasingUnsafeMutablePointer<AnyObject.Type>`.
+        
         let classes = UnsafeRawPointer(classList)
             .bindMemory(to: AnyClass.self, capacity: Int(classCount))
-
+        
         for i in 0..<Int(classCount) {
             let cls: AnyClass = classes[i]
-
+            
             guard let classImageName = class_getImageName(cls) else { continue }
             let classImage = String(cString: classImageName)
             guard classImage == appImagePath else { continue }
-
+            
             var methodCount: UInt32 = 0
             guard let methods = class_copyMethodList(cls, &methodCount) else { continue }
             defer { free(methods) }
-
+            
             for j in 0..<Int(methodCount) {
                 let imp = method_getImplementation(methods[j])
                 let ptr = unsafeBitCast(imp, to: UnsafeRawPointer.self)
-
+                
                 var info = Dl_info()
                 guard dladdr(ptr, &info) != 0, let fname = info.dli_fname else { continue }
                 let impImage = String(cString: fname)
-
+                
                 if impImage != appImagePath &&
-                   !SystemImageValidator.shared.isSystemImage(impImage) {
+                    !SystemImageValidator.shared.isSystemImage(impImage) {
                     let sel = method_getName(methods[j])
                     let className = NSStringFromClass(cls)
                     let selName = NSStringFromSelector(sel)
@@ -206,7 +205,7 @@ public final class SwizzlingDetector {
 #endif
         return false
     }
-    /// Verifies every record in DSK's own `__swift5_types` (type context
+    
     private static func checkSwiftMetadataIntegrity() -> Bool {
 #if !targetEnvironment(simulator)
         let selfPtr = FunctionAddress.of(checkSwiftMetadataIntegrity as () -> Bool)
@@ -215,7 +214,7 @@ public final class SwizzlingDetector {
             return true
         }
         let dskImagePath = String(cString: selfImage)
-
+        
         let imageCount = _dyld_image_count()
         var header: UnsafePointer<mach_header>?
         for i in 0..<imageCount {
@@ -227,12 +226,12 @@ public final class SwizzlingDetector {
         }
         guard let hdr = header else { return false }
         let hdr64 = UnsafeRawPointer(hdr).assumingMemoryBound(to: mach_header_64.self)
-
+        
         let metadataSections: [(segment: String, section: String)] = [
             ("__TEXT", "__swift5_types"),
             ("__TEXT", "__swift5_proto"),
         ]
-
+        
         for (segment, section) in metadataSections {
             if sectionRecordsEscapeImage(hdr64: hdr64, segment: segment, section: section, dskImagePath: dskImagePath) {
                 logger.warning("DSK integrity: Swift metadata record in \(segment),\(section) resolves outside DSK's own image")
@@ -242,8 +241,7 @@ public final class SwizzlingDetector {
 #endif
         return false
     }
-
-    /// Walks an array of 32-bit relative direct pointers (the encoding used by
+    
     private static func sectionRecordsEscapeImage(
         hdr64: UnsafePointer<mach_header_64>,
         segment: String,
@@ -252,38 +250,37 @@ public final class SwizzlingDetector {
     ) -> Bool {
         var size: UInt = 0
         guard let sectionData = getsectiondata(hdr64, segment, section, &size), size > 0 else { return false }
-
+        
         let stride = MemoryLayout<Int32>.size
         let recordCount = min(Int(size) / stride, 5000)
         let base = UnsafeRawPointer(sectionData)
-
+        
         for i in 0..<recordCount {
             let byteOffset = i * stride
             let relativeOffset = base.load(fromByteOffset: byteOffset, as: Int32.self)
             guard relativeOffset != 0 else { continue }
-
+            
             let recordAddress = base.advanced(by: byteOffset)
             let targetAddress = recordAddress.advanced(by: Int(relativeOffset))
-
+            
             var info = Dl_info()
             guard dladdr(targetAddress, &info) != 0, let fname = info.dli_fname else { return true }
-
+            
             if String(cString: fname) != dskImagePath {
                 return true
             }
         }
         return false
     }
-
+    
     // MARK: - Check 4: Known swizzling libraries
-
     private static func checkKnownSwizzlingLibraries() -> Bool {
         let suspiciousLibraries = [
             o.reveal([0x6D, 0xA7, 0x12, 0x98, 0x3B, 0xD0, 0xC3, 0xF8, 0x12, 0xCB, 0x9F, 0x50, 0x43, 0x18]), // libaspects
             o.reveal([0x05, 0x4B, 0x68, 0x83, 0x06, 0x44, 0x0B, 0x24, 0x23, 0x53, 0x5B, 0xDD, 0x73]),        // rsswizzle
             o.reveal([0xD0, 0xD3, 0x2A, 0xED, 0x7C, 0xC0, 0xAD, 0x91, 0x71, 0x3E, 0x71, 0x2C, 0x53]),        // jrswizzle
         ]
-
+        
         let imageCount = _dyld_image_count()
         for i in 0..<imageCount {
             guard let rawName = _dyld_get_image_name(i) else { continue }
@@ -295,7 +292,7 @@ public final class SwizzlingDetector {
                 }
             }
         }
-
+        
         return false
     }
 }

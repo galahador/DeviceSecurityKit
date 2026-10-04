@@ -10,10 +10,9 @@ import Darwin
 import MachO
 
 public final class DylibInjectionDetector {
-
+    
+    // MARK: - Private Properties
     private static let logger = SecurityLogger.security(subsystem: "DylibInjectionDetector")
-
-    /// Not defined in the MachO Swift module; value from `<mach-o/loader.h>`.
     private static let LC_LAZY_LOAD_DYLIB: UInt32 = 0x20
 
     // MARK: - Public

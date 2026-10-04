@@ -22,7 +22,6 @@ internal struct DSKIntegrityChecker {
 
     private static func checkCriticalIMPs() -> Bool {
 #if !targetEnvironment(simulator)
-        // Get the image path for DSK, use this file's own function as anchor
         let selfPtr = FunctionAddress.of(checkCriticalIMPs as () -> Bool)
         var selfInfo = Dl_info()
         guard dladdr(selfPtr, &selfInfo) != 0, let selfImage = selfInfo.dli_fname else {

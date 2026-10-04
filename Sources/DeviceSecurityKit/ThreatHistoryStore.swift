@@ -6,7 +6,6 @@
 import Foundation
 import Security
 
-/// Keychain-backed persistence for `ThreatEvent` history
 internal struct ThreatHistoryStore {
 
     internal static let shared = ThreatHistoryStore()
@@ -29,7 +28,6 @@ internal struct ThreatHistoryStore {
         ]
     }
 
-    /// Persists the given threat history, replacing any previously stored value.
     internal func save(_ events: [ThreatEvent]) {
         guard let data = try? JSONEncoder().encode(events) else { return }
         let query = baseQuery()
@@ -46,7 +44,6 @@ internal struct ThreatHistoryStore {
         }
     }
 
-    /// Loads the previously persisted threat history, or an empty array if none exists.
     internal func load() -> [ThreatEvent] {
         var query = baseQuery()
         query[kSecReturnData as String] = true
@@ -58,12 +55,10 @@ internal struct ThreatHistoryStore {
         return (try? JSONDecoder().decode([ThreatEvent].self, from: data)) ?? []
     }
 
-    /// Removes any persisted threat history.
     internal func clear() {
         SecItemDelete(baseQuery() as CFDictionary)
     }
 
-    /// Whether the Keychain is actually reachable in this process.
     internal func isKeychainAvailable() -> Bool {
         let probeQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

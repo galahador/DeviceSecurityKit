@@ -13,7 +13,6 @@ import UIKit
 
 public extension Countermeasure {
     
-    /// Terminates the app immediately.
     static func killApp(trigger: Trigger = .anyThreat,
                         throttled: Bool = true) -> Countermeasure {
         Countermeasure(trigger: trigger, throttled: throttled) { _ in
@@ -21,7 +20,6 @@ public extension Countermeasure {
         }
     }
     
-    /// Deletes every Keychain item owned by the app across all standard item classes.
     static func wipeKeychain(trigger: Trigger = .anyThreat,
                              throttled: Bool = true,
                              accessGroup: String? = nil) -> Countermeasure {
@@ -30,7 +28,6 @@ public extension Countermeasure {
         }
     }
     
-    /// Covers every connected window with a blur overlay to hide sensitive content.
     @available(iOS 15.0, *)
     static func blurWindow(trigger: Trigger = .anyThreat,
                            throttled: Bool = true,
@@ -44,7 +41,6 @@ public extension Countermeasure {
 }
 
 // MARK: - Keychain Wiper
-
 internal enum KeychainWiper {
     private static let secClasses: [CFString] = [kSecClassGenericPassword,
                                                  kSecClassInternetPassword,
@@ -64,12 +60,10 @@ internal enum KeychainWiper {
 }
 
 // MARK: - Blur Overlay
-
 @available(iOS 15.0, *)
 internal enum BlurOverlay {
     private static let overlayTag = 979_797
     
-    /// Adds a blur overlay to every window of every connected scene. Must run on the main thread.
     internal static func show(style: UIBlurEffect.Style) {
         for scene in UIApplication.shared.connectedScenes {
             guard let windowScene = scene as? UIWindowScene else { continue }
