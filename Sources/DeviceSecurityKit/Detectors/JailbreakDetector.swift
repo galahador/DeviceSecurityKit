@@ -22,7 +22,6 @@ public final class JailbreakDetector {
     private static func defaultURLSchemeChecker() -> ((URL) -> Bool)? {
 #if !targetEnvironment(simulator)
         return { url in
-            // canOpenURL must be called on the main thread
             if Thread.isMainThread {
                 return UIApplication.shared.canOpenURL(url)
             }
@@ -199,7 +198,6 @@ public final class JailbreakDetector {
     
     private static func checkSuspiciousEnvironmentVars() -> Bool {
 #if DEBUG
-        // Xcode injects DYLD_INSERT_LIBRARIES (e.g. Main Thread Checker) in debug builds.
         return false
 #else
         for envVar in jailbreakListOptions.suspiciousVars {
@@ -254,8 +252,6 @@ public final class JailbreakDetector {
         return false
     }
 
-    /// Detects jailbreak-hiding tweaks (e.g. Shadow, Liberty Lite, A-Bypass) by
-    /// scanning loaded images for their injected hook dylibs.
     private static func checkAntiDetectionToolLoadedImages() -> Bool {
         let count = _dyld_image_count()
         for i in 0..<count {

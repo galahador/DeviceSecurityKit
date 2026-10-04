@@ -51,7 +51,6 @@ public struct AppBundleAnalyzer {
         return plist
     }
 
-    /// Returns the relative paths of files whose on-disk SHA-256 doesn't match the hash recorded in _CodeSignature/CodeResources
     public func codeResourcesHashMismatches(criticalFiles: [String]? = nil) -> [String] {
         guard let plist = codeResources,
               let files2 = plist["files2"] as? [String: Any] else {
@@ -77,7 +76,6 @@ public struct AppBundleAnalyzer {
         return mismatches
     }
 
-    /// Info.plist, the main executable, and every embedded framework's Info.plist + binary.
     public func defaultCriticalFiles() -> [String] {
         var files = ["Info.plist", (executablePath as NSString).lastPathComponent]
 
@@ -99,7 +97,6 @@ public struct AppBundleAnalyzer {
     }
 
     // MARK: - Leaf signing certificate
-
     public func leafCertificateSHA256Hex() -> String? {
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: executablePath), options: .mappedIfSafe) else {
             return nil
@@ -108,15 +105,13 @@ public struct AppBundleAnalyzer {
     }
 
     // MARK: - Provisioning profile
-
     public func provisioningProfile() -> [String: Any]? {
         let path = bundlePath + "/embedded.mobileprovision"
         guard let data = FileManager.default.contents(atPath: path) else { return nil }
         return Self.extractPlist(from: data)
     }
 
-    // MARK: - Plist extraction (XML or binary, embedded in CMS envelope)
-
+    // MARK: - Plist extraction
     private static let xmlStartMarker = Data("<?xml".utf8)
     private static let xmlEndMarker   = Data("</plist>".utf8)
     private static let bplistMagic    = Data("bplist00".utf8)

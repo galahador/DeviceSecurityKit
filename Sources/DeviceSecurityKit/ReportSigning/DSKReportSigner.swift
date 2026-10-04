@@ -8,17 +8,17 @@ import Foundation
 import Security
 
 public final class DSKReportSigner: DSKReportSigning, @unchecked Sendable {
-
+    
     public static let shared = DSKReportSigner()
-
+    
     private let keyQueue = DispatchQueue(label: "com.dsk.report-signer.key")
     private let keychainService = "com.dsk.signing"
     private let keychainAccount = "report-key"
-
+    
     private init() {}
-
+    
     // MARK: - Public API
-
+    
     public func sign(_ result: SecurityResult) throws -> SignedSecurityReport {
         let now = Date()
         let inner = DSKReportPayload(nonce: UUID().uuidString, generatedAt: now, result: result)
@@ -27,16 +27,15 @@ public final class DSKReportSigner: DSKReportSigning, @unchecked Sendable {
         let pubKey = try publicKeyData()
         return SignedSecurityReport(payload: payloadData, signature: sig, publicKey: pubKey, generatedAt: now)
     }
-
+    
     public func publicKeyData() throws -> Data {
-        #if targetEnvironment(simulator)
+#if targetEnvironment(simulator)
         return try softwareKey().publicKey.x963Representation
-        #else
+#else
         return try secureEnclaveKey().publicKey.x963Representation
-        #endif
+#endif
     }
-
-    /// Removes the signing key from the Keychain. The next call to `sign(_:)`
+    
     public func deleteKey() throws {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -50,27 +49,25 @@ public final class DSKReportSigner: DSKReportSigning, @unchecked Sendable {
             }
         }
     }
-
+    
     // MARK: - Private
-
     private func signData(_ data: Data) throws -> Data {
-        #if targetEnvironment(simulator)
+#if targetEnvironment(simulator)
         return try softwareKey().signature(for: data).derRepresentation
-        #else
+#else
         return try secureEnclaveKey().signature(for: data).derRepresentation
-        #endif
+#endif
     }
-
+    
     // MARK: - Secure Enclave (on-device)
-
-    #if !targetEnvironment(simulator)
+#if !targetEnvironment(simulator)
     private func secureEnclaveKey() throws -> SecureEnclave.P256.Signing.PrivateKey {
         try keyQueue.sync {
             if let existing = try loadSecureEnclaveKey() { return existing }
             return try generateSecureEnclaveKey()
         }
     }
-
+    
     private func loadSecureEnclaveKey() throws -> SecureEnclave.P256.Signing.PrivateKey? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -98,10 +95,9 @@ public final class DSKReportSigner: DSKReportSigning, @unchecked Sendable {
             return nil
         }
     }
-
+    
     private func generateSecureEnclaveKey() throws -> SecureEnclave.P256.Signing.PrivateKey {
         let key = try SecureEnclave.P256.Signing.PrivateKey()
-        // Store the opaque metadata blob — the raw private key never leaves the SE.
         let attrs: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: keychainService,
@@ -110,24 +106,22 @@ public final class DSKReportSigner: DSKReportSigning, @unchecked Sendable {
             kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
         let status = SecItemAdd(attrs as CFDictionary, nil)
-        // errSecDuplicateItem: concurrent generate race — existing key wins, that's fine.
         guard status == errSecSuccess || status == errSecDuplicateItem else {
             throw DSKSigningError.keychainError(status)
         }
         return key
     }
-    #endif
-
+#endif
+    
     // MARK: - Software key (simulator)
-
-    #if targetEnvironment(simulator)
+#if targetEnvironment(simulator)
     private func softwareKey() throws -> P256.Signing.PrivateKey {
         try keyQueue.sync {
             if let existing = try loadSoftwareKey() { return existing }
             return try generateSoftwareKey()
         }
     }
-
+    
     private func loadSoftwareKey() throws -> P256.Signing.PrivateKey? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -144,7 +138,7 @@ public final class DSKReportSigner: DSKReportSigning, @unchecked Sendable {
         }
         return try P256.Signing.PrivateKey(rawRepresentation: data)
     }
-
+    
     private func generateSoftwareKey() throws -> P256.Signing.PrivateKey {
         let key = P256.Signing.PrivateKey()
         let attrs: [CFString: Any] = [
@@ -160,14 +154,13 @@ public final class DSKReportSigner: DSKReportSigning, @unchecked Sendable {
         }
         return key
     }
-    #endif
+#endif
 }
 
 // MARK: - Error
-
 public enum DSKSigningError: Error, CustomStringConvertible {
     case keychainError(OSStatus)
-
+    
     public var description: String {
         switch self {
         case .keychainError(let status):

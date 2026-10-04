@@ -98,7 +98,6 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
     }
     
     // MARK: - Presets
-    
     public static let `default` = DeviceSecurityConfiguration()
     
     public static let jailbreakOnly = DeviceSecurityConfiguration(
@@ -127,7 +126,6 @@ public struct DeviceSecurityConfiguration: Hashable, Codable, Sendable {
         dylibInjectionDetectionEnabled: true
     )
     
-    /// Lightweight preset: only jailbreak and debugger detection.
     public static let minimal = DeviceSecurityConfiguration(
         jailbreakCheckEnabled: true,
         debuggerCheckEnabled: true,

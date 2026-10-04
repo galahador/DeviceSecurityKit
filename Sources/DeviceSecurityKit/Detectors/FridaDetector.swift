@@ -121,7 +121,6 @@ public final class FridaDetector {
         o.reveal([0x28, 0x0F, 0xD5, 0xD6, 0x22, 0x32, 0xB2, 0x61, 0xD4, 0xED, 0xF9, 0xD3, 0x74, 0x5C, 0x84, 0x6C, 0xE8, 0xCB]), // /usr/lib/frida
     ]
 
-    /// Fingerprints the exact FridaGadget.dylib
     private static func checkFridaGadgetDylibSignature() -> Bool {
         let gadgetDylibName = o.reveal([0x5C, 0xCA, 0x21, 0x9A, 0x1A, 0x55, 0xE9, 0xC7, 0x03, 0xFE, 0xCA, 0x95, 0x4D, 0x5D, 0x92, 0x60, 0xFF, 0xE1, 0x22, 0x53, 0x1F]) // fridagadget.dylib
 
@@ -138,7 +137,6 @@ public final class FridaDetector {
         return false
     }
 
-    /// Checks for filesystem artifacts left by the `re.frida.server` jailbreak tweak / frida-server binary.
     private static func checkFridaServerFilesystemArtifacts() -> Bool {
         let fm = FileManager.default
         for path in fridaServerArtifactPaths {

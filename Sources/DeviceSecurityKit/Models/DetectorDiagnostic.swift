@@ -7,8 +7,6 @@
 
 import Foundation
 
-/// Timing and completion information for a single detector run, captured
-/// during the most recent `gatherThreats()` pass.
 public struct DetectorDiagnostic: Equatable, Codable, Sendable {
     public let duration: TimeInterval
 

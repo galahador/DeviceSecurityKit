@@ -8,7 +8,6 @@
 import Foundation
 import UIKit
 
-/// Monitors the system pasteboard for unexpected changes
 public final class ClipboardMonitor {
 
     private static let logger = SecurityLogger.security(subsystem: "ClipboardMonitor")
@@ -39,7 +38,6 @@ public final class ClipboardMonitor {
         set { stateQueue.sync(flags: .barrier) { _detectionWindowSeconds = newValue } }
     }
 
-    /// Returns true if the pasteboard changed unexpectedly
     static func wasClipboardModifiedExternally() -> Bool {
         return stateQueue.sync {
             guard _externalChangeDetected, let lastDate = _lastExternalChangeDate else { return false }
@@ -54,7 +52,6 @@ public final class ClipboardMonitor {
         return wasClipboardModifiedExternally() ? ["clipboardChangedAfterSensitiveCopy"] : []
     }
 
-    /// Starts observing `UIPasteboard.changedNotification`. Safe to call multiple times.
     static func startObserving() {
         let alreadyObserving = stateQueue.sync(flags: .barrier) { () -> Bool in
             if _isObserving { return true }
@@ -72,7 +69,6 @@ public final class ClipboardMonitor {
         )
     }
 
-    /// Stops observing and clears detection state.
     static func stopObserving() {
         stateQueue.sync(flags: .barrier) {
             _isObserving = false
@@ -90,7 +86,6 @@ public final class ClipboardMonitor {
     }
 
     // MARK: - Private
-
     @objc private static func handlePasteboardChange() {
         let currentCount = UIPasteboard.general.changeCount
         stateQueue.sync(flags: .barrier) {

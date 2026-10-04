@@ -149,7 +149,6 @@ public final class AttestationDetector {
         updateState(attempted: true, failed: true)
     }
 
-    /// Updates in-memory verdict state and, if `persistenceEnabled`, mirrors it to the Keychain.
     private static func updateState(attempted: Bool, failed: Bool) {
         let persist = stateQueue.sync(flags: .barrier) { () -> Bool in
             _hasAttempted = attempted

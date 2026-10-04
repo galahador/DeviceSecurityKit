@@ -8,8 +8,6 @@
 import Foundation
 import BackgroundTasks
 
-/// Background-refresh integration for running security checks while the app
-/// is suspended.
 extension DSK {
 
     private static let backgroundTasksLogger = SecurityLogger.security(subsystem: "DSK+BackgroundTasks")

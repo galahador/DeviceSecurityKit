@@ -7,7 +7,6 @@
 
 import Foundation
 
-/// Single source of truth for "does this Mach-O image path point into an Apple system location
 internal struct SystemImageValidator {
 
     internal static let shared = SystemImageValidator()

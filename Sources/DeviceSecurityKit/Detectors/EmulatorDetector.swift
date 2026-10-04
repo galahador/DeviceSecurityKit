@@ -11,8 +11,7 @@ import DeviceCheck
 
 public final class EmulatorDetector {
 
-    // MARK: - Public Types
-
+    // MARK: - Public
     public struct DetectionResult {
         public let isEmulator: Bool
         public let detectionMethods: [String]
@@ -27,43 +26,20 @@ public final class EmulatorDetector {
         }
     }
 
+    public static var minimumDetectionMethods: Int = 2
+    
     // MARK: - Private Properties
-
     private static let logger = SecurityLogger.detection(subsystem: "DeviceSecurityKit")
     private static let emulatorDetectorListOptions = EmulatorDetectorListOptions()
-
-    /// Minimum number of independent detection methods that must trigger before
-    /// flagging as emulator. Default is 2 to reduce single-signal false positives.
-    public static var minimumDetectionMethods: Int = 2
-
     private static var cachedDeviceModel: String?
     private static let cacheQueue = DispatchQueue(label: "com.devicesecuritykit.emulator.cache", attributes: .concurrent)
 
     // MARK: - Public Methods
-
     public static func isEmulator() -> Bool {
         let result = detectEmulator()
         return result.isEmulator
     }
 
-    /// Runs all emulator detection heuristics and returns a scored result.
-    ///
-    /// Each heuristic contributes a weighted confidence score:
-    ///
-    /// | Check                        | Weight |
-    /// |------------------------------|--------|
-    /// | `simulatorPaths`             | 1.5    |
-    /// | `deviceModel`                | 1.5    |
-    /// | `systemProperties`           | 2.0    |
-    /// | `runtimeEnvironment`         | 0.8    |
-    /// | `processEnvironment`         | 1.2    |
-    /// | `hardwareIdentifierMismatch` | 2.0    |
-    /// | `deviceCheckUnsupported`     | 1.5    |
-    ///
-    /// **Max possible score**: 10.5. The reported `confidence` is
-    /// `sum / maxScore`, clamped to `[0, 1]`. A device is flagged as an
-    /// emulator only when **>= 2 independent checks** fire, reducing
-    /// false positives from single-signal noise.
     public static func detectEmulator() -> DetectionResult {
 
         if checkSimulatorEnvironment() {
@@ -76,7 +52,6 @@ public final class EmulatorDetector {
             )
         }
 
-        // Runtime checks — require >= 2 signals to reduce false positives on real devices
         var detectionMethods: [String] = []
         var confidenceScore: Float = 0.0
         let maxConfidenceScore: Float = 10.5
@@ -351,9 +326,7 @@ public final class EmulatorDetector {
     }
 
     // MARK: - Helper Methods
-
     private static func getDeviceModelIdentifier() -> String {
-        // Single barrier call to avoid TOCTOU: read-or-populate atomically.
         return cacheQueue.sync(flags: .barrier) {
             if let cached = cachedDeviceModel {
                 return cached

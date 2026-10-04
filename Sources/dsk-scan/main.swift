@@ -63,9 +63,6 @@ func parseArguments(_ arguments: [String]) -> ParseResult {
     return .options(options)
 }
 
-/// Extracts an `.ipa` to a temporary directory and returns the path to `Payload/*.app`.
-/// dsk-scan is a macOS/CI tool — `Process` (used to invoke `/usr/bin/unzip`) isn't available on iOS,
-/// which is otherwise part of this package's platform set.
 #if os(macOS)
 func extractIPA(at path: String) throws -> String {
     let tempDir = FileManager.default.temporaryDirectory
@@ -177,7 +174,6 @@ func runChecks(bundlePath: String, options: CLIOptions) -> [CheckResult] {
 }
 
 // MARK: - Entry point
-
 let options: CLIOptions
 switch parseArguments(CommandLine.arguments) {
 case .options(let parsed):

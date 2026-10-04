@@ -12,19 +12,16 @@ import MachO
 
 public final class DebuggerDetector {
     
-    private static let logger = SecurityLogger.security(subsystem: "DebuggerDetector")
-    private static let debuggerDetectorList = DebuggerDetectorList()
-    
-    /// Timing analysis ratio threshold. A test/baseline ratio above this value
-    /// triggers detection. Default is 10. Lower values increase sensitivity but
-    /// also increase false positives on slow or thermally-throttled devices.
+    // MARK: - Public
     public static var timingThreshold: UInt64 = 10
 
+    // MARK: - Private Properties
+    private static let logger = SecurityLogger.security(subsystem: "DebuggerDetector")
+    private static let debuggerDetectorList = DebuggerDetectorList()
     private static let denyAttachQueue = DispatchQueue(label: "DebuggerDetector.denyAttach", qos: .background)
     private static var denyAttachTimer: DispatchSourceTimer?
     
     // MARK: - Continuous PT_DENY_ATTACH Hardening
-    
     public static func startContinuousDenyAttach(interval: TimeInterval = 1.0) {
 #if !DEBUG
         denyAttachQueue.sync {
