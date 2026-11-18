@@ -9,6 +9,15 @@ import Foundation
 
 internal struct SystemImageValidator {
 
+    private struct Constants {
+        static let privatePrefix = "/private"
+        static let privateVarPrefix = "/private/var/"
+        static let pathSeparator = "/"
+        static let listSeparator: Character = ":"
+        static let developerPrefix = "/Developer/"
+        static let runtimeRoot = "/RuntimeRoot"
+    }
+
     internal static let shared = SystemImageValidator()
 
     private let systemPrefixes: [String]
@@ -26,9 +35,22 @@ internal struct SystemImageValidator {
         systemPrefixes.contains { normalizedImagePath(path).hasPrefix($0) }
     }
 
+    internal func pathRelativeToAppBundle(_ path: String) -> String? {
+        func strip(_ p: String) -> String { p.hasPrefix(Constants.privateVarPrefix) ? String(p.dropFirst(Constants.privatePrefix.count)) : p }
+        let bundle = strip(Bundle.main.bundlePath) + Constants.pathSeparator
+        let candidate = strip(path)
+        return candidate.hasPrefix(bundle) ? String(candidate.dropFirst(bundle.count)) : nil
+    }
+
+    internal func isBenignDyldValue(_ value: String) -> Bool {
+        value.split(separator: Constants.listSeparator).map(String.init).allSatisfy { entry in
+            isSystemImage(entry) || entry.hasPrefix(Constants.developerPrefix) || pathRelativeToAppBundle(entry) != nil
+        }
+    }
+
     internal func normalizedImagePath(_ path: String) -> String {
 #if targetEnvironment(simulator)
-        if let range = path.range(of: "/RuntimeRoot") {
+        if let range = path.range(of: Constants.runtimeRoot) {
             return String(path[range.upperBound...])
         }
 #endif

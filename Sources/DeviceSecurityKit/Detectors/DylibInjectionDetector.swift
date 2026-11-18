@@ -11,11 +11,49 @@ import MachO
 
 public final class DylibInjectionDetector {
     
-    // MARK: - Private Properties
-    private static let logger = SecurityLogger.security(subsystem: "DylibInjectionDetector")
-    private static let LC_LAZY_LOAD_DYLIB: UInt32 = 0x20
+    private struct Constants {
+        static let loggerSubsystem = "DylibInjectionDetector"
 
-    // MARK: - Public
+        static let envVarBytes: [UInt8] = [
+            0xAA, 0xBB, 0xCC, 0xDD, 0xEA, 0x83, 0x22, 0xC2,
+            0xEF, 0x15, 0x51, 0x4F, 0x4B, 0x04, 0x23, 0x12,
+            0x5D, 0x9B, 0x55, 0x6F, 0x9B, 0xAB, 0x9F, 0xAB, 0xBA
+        ]
+        static let envVarSeparator: Character = ":"
+
+        static let evidenceEnvVarLabel = "envVar"
+        static let evidenceInjectedImageLabel = "injectedImage"
+        static let evidenceLoadCommandLabel = "unexpectedLoadCommand"
+
+        static let logEnvVarSet = "Dylib injection: DYLD_INSERT_LIBRARIES is set"
+        static let logUnexpectedImage = "Dylib injection: unexpected loaded image: "
+        static let logUnexpectedLoadCommand = "Dylib injection: unexpected LC_LOAD_DYLIB: "
+
+        static let privatePrefix = "/private"
+        static let privateVarPrefix = "/private/var/"
+        static let pathSeparator = "/"
+
+        static let systemPrefixes = ["/System/", "/usr/lib/", "/Developer/"]
+        static let prebootPrefixes = ["/private/preboot/", "/private/var/preboot/", "/var/preboot/"]
+        static let cryptexMarkers = ["/Cryptexes/", "/cryptex1/"]
+
+        static let coreSimulatorPrefix = "/Library/Developer/CoreSimulator/"
+        static let xcodeAppPrefix = "/Applications/Xcode"
+        static let developerLibraryPrefix = "/Library/Developer/"
+
+        static let relativePrefixes = ["@rpath/", "@executable_path/", "@loader_path/"]
+
+        static func assignment(_ name: String, _ value: String) -> String {
+            "\(name)=\(value)"
+        }
+
+        static func evidence(_ label: String, _ value: String) -> String {
+            "\(label)(\"\(value)\")"
+        }
+    }
+    
+    private static let logger = SecurityLogger.security(subsystem: Constants.loggerSubsystem)
+    private static let LC_LAZY_LOAD_DYLIB: UInt32 = 0x20
 
     public static func isDylibInjected() -> Bool {
 #if targetEnvironment(simulator)
@@ -31,34 +69,24 @@ public final class DylibInjectionDetector {
 #else
         var evidence: [String] = []
 
-        // DYLD_INSERT_LIBRARIES
 #if !DEBUG
         let o = StringObfuscator.shared
-        let envVar = o.reveal([
-            0xAA, 0xBB, 0xCC, 0xDD, 0xEA, 0x83, 0x22, 0xC2,
-            0xEF, 0x15, 0x51, 0x4F, 0x4B, 0x04, 0x23, 0x12,
-            0x5D, 0x9B, 0x55, 0x6F, 0x9B, 0xAB, 0x9F, 0xAB, 0xBA
-        ])
-        if let val = getenv(envVar) {
-            let value = String(cString: val)
-            if !value.isEmpty {
-                evidence.append("envVar(\"\(envVar)=\(value)\")")
-            }
+        let envVar = o.reveal(Constants.envVarBytes)
+        if let value = unexpectedInsertedLibraries(envVar) {
+            evidence.append(Constants.evidence(Constants.evidenceEnvVarLabel, Constants.assignment(envVar, value)))
         }
 #endif
 
-        // Loaded images
         let appBundlePath = Bundle.main.bundlePath
         let imageCount = _dyld_image_count()
         for i in 0..<imageCount {
             guard let name = _dyld_get_image_name(i) else { continue }
             let path = String(cString: name)
             if !isExpectedImagePath(path, appBundlePath: appBundlePath) {
-                evidence.append("injectedImage(\"\(path)\")")
+                evidence.append(Constants.evidence(Constants.evidenceInjectedImageLabel, path))
             }
         }
 
-        // LC_LOAD_DYLIB commands
         if let header = _dyld_get_image_header(0) {
             let rawPtr = UnsafeRawPointer(header)
             let magic = rawPtr.load(as: UInt32.self)
@@ -86,7 +114,7 @@ public final class DylibInjectionDetector {
                         let namePtr = cmdPtr.advanced(by: nameOffset).assumingMemoryBound(to: CChar.self)
                         let dylibPath = String(cString: namePtr)
                         if !isExpectedDylibPath(dylibPath) {
-                            evidence.append("unexpectedLoadCommand(\"\(dylibPath)\")")
+                            evidence.append(Constants.evidence(Constants.evidenceLoadCommandLabel, dylibPath))
                         }
                     }
                 }
@@ -98,27 +126,30 @@ public final class DylibInjectionDetector {
 #endif
     }
 
-    // MARK: - Check 1: DYLD_INSERT_LIBRARIES environment variable
-
     private static func checkDYLDEnvironment() -> Bool {
 #if DEBUG
         return false
 #else
         let o = StringObfuscator.shared
-        let envVar = o.reveal([
-            0xAA, 0xBB, 0xCC, 0xDD, 0xEA, 0x83, 0x22, 0xC2,
-            0xEF, 0x15, 0x51, 0x4F, 0x4B, 0x04, 0x23, 0x12,
-            0x5D, 0x9B, 0x55, 0x6F, 0x9B, 0xAB, 0x9F, 0xAB, 0xBA
-        ])
-        if let val = getenv(envVar), String(cString: val).count > 0 {
-            logger.warning("Dylib injection: DYLD_INSERT_LIBRARIES is set")
+        let envVar = o.reveal(Constants.envVarBytes)
+        if unexpectedInsertedLibraries(envVar) != nil {
+            logger.warning(Constants.logEnvVarSet)
             return true
         }
         return false
 #endif
     }
 
-    // MARK: - Check 2: Audit all loaded dyld images for non-system, non-app paths
+    private static func unexpectedInsertedLibraries(_ envVar: String) -> String? {
+        guard let val = getenv(envVar) else { return nil }
+        let value = String(cString: val)
+        let appBundlePath = Bundle.main.bundlePath
+        let unexpected = value
+            .split(separator: Constants.envVarSeparator)
+            .map(String.init)
+            .filter { !isExpectedImagePath($0, appBundlePath: appBundlePath) }
+        return unexpected.isEmpty ? nil : value
+    }
 
     private static func checkLoadedImages() -> Bool {
         let appBundlePath = Bundle.main.bundlePath
@@ -129,15 +160,13 @@ public final class DylibInjectionDetector {
             let path = String(cString: name)
 
             if !isExpectedImagePath(path, appBundlePath: appBundlePath) {
-                logger.warning("Dylib injection: unexpected loaded image: \(SecurityLogger.redact(path))")
+                logger.warning(Constants.logUnexpectedImage + SecurityLogger.redact(path))
                 return true
             }
         }
 
         return false
     }
-
-    // MARK: - Check 3: Parse main executable's load commands for unexpected LC_LOAD_DYLIB entries
 
     private static func checkMainBinaryLoadCommands() -> Bool {
         guard let header = _dyld_get_image_header(0) else { return false }
@@ -167,14 +196,13 @@ public final class DylibInjectionDetector {
 
             guard cmd == LC_LOAD_DYLIB || cmd == LC_LOAD_WEAK_DYLIB || cmd == LC_REEXPORT_DYLIB || cmd == LC_LAZY_LOAD_DYLIB else { continue }
 
-            // dylib_command: cmd(4) + cmdsize(4) + name_offset(4) + timestamp(4) + versions(8)
             let nameOffset = Int(cmdPtr.load(fromByteOffset: 8, as: UInt32.self))
             guard nameOffset >= 12, nameOffset < Int(cmdsize) else { continue }
             let namePtr = cmdPtr.advanced(by: nameOffset).assumingMemoryBound(to: CChar.self)
             let dylibPath = String(cString: namePtr)
 
             if !isExpectedDylibPath(dylibPath) {
-                logger.warning("Dylib injection: unexpected LC_LOAD_DYLIB: \(SecurityLogger.redact(dylibPath))")
+                logger.warning(Constants.logUnexpectedLoadCommand + SecurityLogger.redact(dylibPath))
                 return true
             }
         }
@@ -182,24 +210,41 @@ public final class DylibInjectionDetector {
         return false
     }
 
-    // MARK: - Path Validation
+    private static func normalized(_ path: String) -> String {
+        path.hasPrefix(Constants.privateVarPrefix) ? String(path.dropFirst(Constants.privatePrefix.count)) : path
+    }
+
+    private static func isSystemPath(_ path: String) -> Bool {
+        if Constants.systemPrefixes.contains(where: path.hasPrefix) {
+            return true
+        }
+        if Constants.prebootPrefixes.contains(where: path.hasPrefix) {
+            return Constants.cryptexMarkers.contains(where: path.contains)
+        }
+        return false
+    }
+
+    private static func isInsideAppBundle(_ path: String, appBundlePath: String) -> Bool {
+        func withSlash(_ p: String) -> String { p.hasSuffix(Constants.pathSeparator) ? p : p + Constants.pathSeparator }
+        if normalized(path).hasPrefix(withSlash(normalized(appBundlePath))) {
+            return true
+        }
+        let resolvedBundle = withSlash((appBundlePath as NSString).resolvingSymlinksInPath)
+        return (path as NSString).resolvingSymlinksInPath.hasPrefix(resolvedBundle)
+    }
 
     private static func isExpectedImagePath(_ path: String, appBundlePath: String) -> Bool {
-        // App bundle (main executable + embedded frameworks)
-        if path.hasPrefix(appBundlePath) {
+        if isSystemPath(path) {
             return true
         }
-        // System frameworks and libraries
-        if path.hasPrefix("/System/") || path.hasPrefix("/usr/lib/") {
+        if isInsideAppBundle(path, appBundlePath: appBundlePath) {
             return true
         }
-        // CoreSimulator runtime (simulator-hosted system libs resolve here)
-        if path.hasPrefix("/Library/Developer/CoreSimulator/") {
+        if path.hasPrefix(Constants.coreSimulatorPrefix) {
             return true
         }
 #if DEBUG
-        // Xcode injected libs (hot reload, sanitizers, etc.)
-        if path.hasPrefix("/Applications/Xcode") || path.hasPrefix("/Library/Developer/") {
+        if path.hasPrefix(Constants.xcodeAppPrefix) || path.hasPrefix(Constants.developerLibraryPrefix) {
             return true
         }
 #endif
@@ -207,12 +252,10 @@ public final class DylibInjectionDetector {
     }
 
     private static func isExpectedDylibPath(_ path: String) -> Bool {
-        // Relative paths resolved by dyld at load time — normal for embedded frameworks
-        if path.hasPrefix("@rpath/") || path.hasPrefix("@executable_path/") || path.hasPrefix("@loader_path/") {
+        if Constants.relativePrefixes.contains(where: path.hasPrefix) {
             return true
         }
-        // System paths
-        if path.hasPrefix("/System/") || path.hasPrefix("/usr/lib/") {
+        if isSystemPath(path) {
             return true
         }
         return false

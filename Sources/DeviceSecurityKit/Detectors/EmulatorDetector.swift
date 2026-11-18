@@ -11,6 +11,82 @@ import DeviceCheck
 
 public final class EmulatorDetector {
 
+    private struct Constants {
+        static let loggerSubsystem = "DeviceSecurityKit"
+        static let cacheQueueLabel = "com.devicesecuritykit.emulator.cache"
+
+        static let methodCompilationTarget = "targetEnvironment(simulator)"
+        static let methodSimulatorPaths = "simulatorPaths"
+        static let methodDeviceModel = "deviceModel"
+        static let methodSystemProperties = "systemProperties"
+        static let methodRuntimeEnvironment = "runtimeEnvironment"
+        static let methodProcessEnvironment = "processEnvironment"
+        static let methodHardwareMismatch = "hardwareIdentifierMismatch"
+        static let methodDeviceCheck = "deviceCheckUnsupported"
+        static let methodSeparator = ", "
+
+        static let publicDetected = "Emulator detected"
+        static let publicNotDetected = "No emulator detected. Running on physical iOS device."
+        static let debugPlaceholder = "/"
+        static let debugViaCompilationTarget = "Emulator detected via compilation target"
+        static let debugViaPaths = "Emulator detected via filesystem paths"
+        static let debugViaModel = "Emulator detected via device model"
+        static let debugViaProperties = "Emulator detected via system properties"
+        static let debugViaRuntime = "Emulator detected via runtime environment"
+        static let debugViaProcess = "Emulator detected via process environment"
+        static let debugViaHardware = "Emulator detected via hw.machine vs uname mismatch"
+        static let debugViaDeviceCheck = "Emulator detected via DeviceCheck unavailability"
+
+        static let bridgePath = "/System/Library/CoreServices/CoreSimulatorBridge.app"
+        static let frameworkPath = "/System/Library/PrivateFrameworks/CoreSimulator.framework"
+        static let developerPath = "/Library/Developer/CoreSimulator"
+        static let coreSimulatorMarker = "/CoreSimulator/"
+
+        static let archI386 = "i386"
+        static let archX86_64 = "x86_64"
+        static let simulatorLowercase = "simulator"
+        static let simulatorCapitalized = "Simulator"
+        static let arm64 = "arm64"
+
+        static let envDeviceName = "SIMULATOR_DEVICE_NAME"
+        static let envVersionInfo = "SIMULATOR_VERSION_INFO"
+
+        static let realityDevicePrefix = "RealityDevice"
+        static let unknownModel = "Unknown"
+
+        static let simulatorEnvDebugger = "Debugger attachment detected in simulator environment"
+        static let realDeviceDebugger = "Debugger detected but appears to be real device debugging"
+        static let deviceCheckUnsupportedLog = "DeviceCheck not supported — likely simulator"
+
+        static func detectedWithConfidence(_ confidence: Float, _ methods: [String]) -> String {
+            "Emulator detected with confidence: \(String(format: "%.2f", confidence * 100))%. Methods: \(methods.joined(separator: methodSeparator))"
+        }
+        static func criticalPathFound(_ path: String) -> String {
+            "Found critical emulator-specific path: \(path)"
+        }
+        static func additionalPathFound(_ path: String) -> String {
+            "Found additional simulator path: \(path)"
+        }
+        static func simulatorArchitecture(_ model: String) -> String {
+            "Detected simulator-only architecture: \(model)"
+        }
+        static func simulatorInModel(_ model: String) -> String {
+            "Found 'Simulator' in model identifier: \(model)"
+        }
+        static func simulatorEnvVar(_ name: String) -> String {
+            "Found simulator environment variable: \(name)"
+        }
+        static func simulatorArgument(_ argument: String) -> String {
+            "Found simulator-specific argument: \(argument)"
+        }
+        static func simulatorBundlePath(_ path: String) -> String {
+            "Bundle path indicates simulator: \(path)"
+        }
+        static func nonIOSMachine(_ machine: String) -> String {
+            "hw.machine returned non-iOS device identifier: \(machine)"
+        }
+    }
+
     // MARK: - Public
     public struct DetectionResult {
         public let isEmulator: Bool
@@ -29,10 +105,10 @@ public final class EmulatorDetector {
     public static var minimumDetectionMethods: Int = 2
     
     // MARK: - Private Properties
-    private static let logger = SecurityLogger.detection(subsystem: "DeviceSecurityKit")
+    private static let logger = SecurityLogger.detection(subsystem: Constants.loggerSubsystem)
     private static let emulatorDetectorListOptions = EmulatorDetectorListOptions()
     private static var cachedDeviceModel: String?
-    private static let cacheQueue = DispatchQueue(label: "com.devicesecuritykit.emulator.cache", attributes: .concurrent)
+    private static let cacheQueue = DispatchQueue(label: Constants.cacheQueueLabel, attributes: .concurrent)
 
     // MARK: - Public Methods
     public static func isEmulator() -> Bool {
@@ -43,11 +119,11 @@ public final class EmulatorDetector {
     public static func detectEmulator() -> DetectionResult {
 
         if checkSimulatorEnvironment() {
-            secureLog(publicMessage: "Emulator detected",
-                      debugMessage: "Emulator detected via compilation target", logger: logger)
+            secureLog(publicMessage: Constants.publicDetected,
+                      debugMessage: Constants.debugViaCompilationTarget, logger: logger)
             return DetectionResult(
                 isEmulator: true,
-                detectionMethods: ["targetEnvironment(simulator)"],
+                detectionMethods: [Constants.methodCompilationTarget],
                 confidence: 1.0
             )
         }
@@ -57,52 +133,52 @@ public final class EmulatorDetector {
         let maxConfidenceScore: Float = 10.5
 
         if checkSimulatorPaths() {
-            detectionMethods.append("simulatorPaths")
+            detectionMethods.append(Constants.methodSimulatorPaths)
             confidenceScore += 1.5
-            secureLog(publicMessage: "Emulator detected",
-                      debugMessage: "Emulator detected via filesystem paths", logger: logger)
+            secureLog(publicMessage: Constants.publicDetected,
+                      debugMessage: Constants.debugViaPaths, logger: logger)
         }
 
         if checkDeviceModel() {
-            detectionMethods.append("deviceModel")
+            detectionMethods.append(Constants.methodDeviceModel)
             confidenceScore += 1.5
-            secureLog(publicMessage: "Emulator detected",
-                      debugMessage: "Emulator detected via device model", logger: logger)
+            secureLog(publicMessage: Constants.publicDetected,
+                      debugMessage: Constants.debugViaModel, logger: logger)
         }
 
         if checkSystemProperties() {
-            detectionMethods.append("systemProperties")
+            detectionMethods.append(Constants.methodSystemProperties)
             confidenceScore += 2.0
-            secureLog(publicMessage: "Emulator detected",
-                      debugMessage: "Emulator detected via system properties", logger: logger)
+            secureLog(publicMessage: Constants.publicDetected,
+                      debugMessage: Constants.debugViaProperties, logger: logger)
         }
 
         if checkRuntimeEnvironment() {
-            detectionMethods.append("runtimeEnvironment")
+            detectionMethods.append(Constants.methodRuntimeEnvironment)
             confidenceScore += 0.8
-            secureLog(publicMessage: "Emulator detected",
-                      debugMessage: "Emulator detected via runtime environment", logger: logger)
+            secureLog(publicMessage: Constants.publicDetected,
+                      debugMessage: Constants.debugViaRuntime, logger: logger)
         }
 
         if checkProcessEnvironment() {
-            detectionMethods.append("processEnvironment")
+            detectionMethods.append(Constants.methodProcessEnvironment)
             confidenceScore += 1.2
-            secureLog(publicMessage: "Emulator detected",
-                      debugMessage: "Emulator detected via process environment", logger: logger)
+            secureLog(publicMessage: Constants.publicDetected,
+                      debugMessage: Constants.debugViaProcess, logger: logger)
         }
 
         if checkHardwareIdentifierMismatch() {
-            detectionMethods.append("hardwareIdentifierMismatch")
+            detectionMethods.append(Constants.methodHardwareMismatch)
             confidenceScore += 2.0
-            secureLog(publicMessage: "Emulator detected",
-                      debugMessage: "Emulator detected via hw.machine vs uname mismatch", logger: logger)
+            secureLog(publicMessage: Constants.publicDetected,
+                      debugMessage: Constants.debugViaHardware, logger: logger)
         }
 
         if checkDeviceCheckUnsupported() {
-            detectionMethods.append("deviceCheckUnsupported")
+            detectionMethods.append(Constants.methodDeviceCheck)
             confidenceScore += 1.5
-            secureLog(publicMessage: "Emulator detected",
-                      debugMessage: "Emulator detected via DeviceCheck unavailability", logger: logger)
+            secureLog(publicMessage: Constants.publicDetected,
+                      debugMessage: Constants.debugViaDeviceCheck, logger: logger)
         }
 
         let confidence = min(confidenceScore / maxConfidenceScore, 1.0)
@@ -115,11 +191,11 @@ public final class EmulatorDetector {
         )
 
         if isEmulator {
-            secureLog(publicMessage: "Emulator detected with confidence: \(String(format: "%.2f", confidence * 100))%. Methods: \(detectionMethods.joined(separator: ", "))",
-                      debugMessage: "Emulator detected", logger: logger)
+            secureLog(publicMessage: Constants.detectedWithConfidence(confidence, detectionMethods),
+                      debugMessage: Constants.publicDetected, logger: logger)
         } else {
-            secureLog(publicMessage: "No emulator detected. Running on physical iOS device.",
-                      debugMessage: "/", logger: logger)
+            secureLog(publicMessage: Constants.publicNotDetected,
+                      debugMessage: Constants.debugPlaceholder, logger: logger)
         }
 
         return result
@@ -145,14 +221,14 @@ public final class EmulatorDetector {
 
     private static func checkSimulatorPaths() -> Bool {
         let criticalPaths = [
-            "/System/Library/CoreServices/CoreSimulatorBridge.app",
-            "/System/Library/PrivateFrameworks/CoreSimulator.framework",
-            "/Library/Developer/CoreSimulator"
+            Constants.bridgePath,
+            Constants.frameworkPath,
+            Constants.developerPath
         ]
 
         for path in criticalPaths {
             if FileManager.default.fileExists(atPath: path) {
-                logger.debug("Found critical emulator-specific path: \(SecurityLogger.redact(path))")
+                logger.debug(Constants.criticalPathFound(SecurityLogger.redact(path)))
                 return true
             }
         }
@@ -165,7 +241,7 @@ public final class EmulatorDetector {
         for path in additionalPaths {
             if FileManager.default.fileExists(atPath: path) {
                 additionalMatches += 1
-                logger.debug("Found additional simulator path: \(SecurityLogger.redact(path))")
+                logger.debug(Constants.additionalPathFound(SecurityLogger.redact(path)))
             }
         }
 
@@ -176,23 +252,23 @@ public final class EmulatorDetector {
         let modelIdentifier = getDeviceModelIdentifier()
 
         let simulatorOnlyIdentifiers = [
-            "i386",
-            "x86_64"
+            Constants.archI386,
+            Constants.archX86_64
         ]
 
         for identifier in simulatorOnlyIdentifiers {
             if modelIdentifier.lowercased() == identifier.lowercased() {
-                logger.debug("Detected simulator-only architecture: \(SecurityLogger.redact(modelIdentifier))")
+                logger.debug(Constants.simulatorArchitecture(SecurityLogger.redact(modelIdentifier)))
                 return true
             }
         }
 
-        if modelIdentifier.lowercased().contains("simulator") {
-            logger.debug("Found 'Simulator' in model identifier: \(SecurityLogger.redact(modelIdentifier))")
+        if modelIdentifier.lowercased().contains(Constants.simulatorLowercase) {
+            logger.debug(Constants.simulatorInModel(SecurityLogger.redact(modelIdentifier)))
             return true
         }
 
-        if modelIdentifier.lowercased().contains("arm64") {
+        if modelIdentifier.lowercased().contains(Constants.arm64) {
             return checkIfSimulatorOnAppleSilicon()
         }
 
@@ -205,13 +281,13 @@ public final class EmulatorDetector {
         let processName = ProcessInfo.processInfo.processName
         let environment = ProcessInfo.processInfo.environment
 
-        if environment["SIMULATOR_DEVICE_NAME"] != nil ||
-            environment["SIMULATOR_VERSION_INFO"] != nil ||
+        if environment[Constants.envDeviceName] != nil ||
+            environment[Constants.envVersionInfo] != nil ||
             environment[o.reveal([0xDE, 0x8D, 0x7B, 0x6D, 0x03, 0x36, 0x6B, 0x12, 0x16, 0x34, 0xA5, 0xEE, 0xCA, 0xC8, 0x02, 0xED, 0x39, 0x63])] != nil {
             return true
         }
 
-        if processName.contains("Simulator") || processName.contains("simulator") {
+        if processName.contains(Constants.simulatorCapitalized) || processName.contains(Constants.simulatorLowercase) {
             return true
         }
 
@@ -222,7 +298,7 @@ public final class EmulatorDetector {
 
         for envVar in EmulatorDetector.emulatorDetectorListOptions.suspiciousEnvVars {
             if getenv(envVar) != nil {
-                logger.debug("Found simulator environment variable: \(SecurityLogger.redact(envVar))")
+                logger.debug(Constants.simulatorEnvVar(SecurityLogger.redact(envVar)))
                 return true
             }
         }
@@ -244,14 +320,14 @@ public final class EmulatorDetector {
 
             if isDebuggerAttached {
                 let environment = ProcessInfo.processInfo.environment
-                let hasSimulatorEnv = environment["SIMULATOR_DEVICE_NAME"] != nil ||
-                environment["SIMULATOR_VERSION_INFO"] != nil
+                let hasSimulatorEnv = environment[Constants.envDeviceName] != nil ||
+                environment[Constants.envVersionInfo] != nil
 
                 if hasSimulatorEnv {
-                    logger.debug("Debugger attachment detected in simulator environment")
+                    logger.debug(Constants.simulatorEnvDebugger)
                     return true
                 }
-                logger.debug("Debugger detected but appears to be real device debugging")
+                logger.debug(Constants.realDeviceDebugger)
             }
         }
 
@@ -259,24 +335,20 @@ public final class EmulatorDetector {
     }
 
     private static func checkProcessEnvironment() -> Bool {
-        let processName = ProcessInfo.processInfo.processName
         let arguments = ProcessInfo.processInfo.arguments
 
-        if processName.lowercased().contains("simulator") {
-            logger.debug("Process name contains 'simulator': \(SecurityLogger.redact(processName))")
-            return true
-        }
+
 
         for argument in arguments {
-            if argument.contains("Simulator") || argument.contains("/CoreSimulator/") {
-                logger.debug("Found simulator-specific argument: \(SecurityLogger.redact(argument))")
+            if argument.contains(Constants.coreSimulatorMarker) {
+                logger.debug(Constants.simulatorArgument(SecurityLogger.redact(argument)))
                 return true
             }
         }
 
         let bundlePath = Bundle.main.bundlePath
-        if bundlePath.contains("CoreSimulator") || bundlePath.contains("Simulator") {
-            logger.debug("Bundle path indicates simulator: \(SecurityLogger.redact(bundlePath))")
+        if bundlePath.contains(Constants.coreSimulatorMarker) {
+            logger.debug(Constants.simulatorBundlePath(SecurityLogger.redact(bundlePath)))
             return true
         }
 
@@ -297,12 +369,16 @@ public final class EmulatorDetector {
             || sysctlMachine.hasPrefix(ipadPrefix)
             || sysctlMachine.hasPrefix(ipodPrefix)
 
-        if !isRealDevice {
-            logger.debug("hw.machine returned non-iOS device identifier: \(SecurityLogger.redact(sysctlMachine))")
+        if !isRealDevice && !isCompatibilityHost(sysctlMachine) {
+            logger.debug(Constants.nonIOSMachine(SecurityLogger.redact(sysctlMachine)))
             return true
         }
 
         return false
+    }
+
+    private static func isCompatibilityHost(_ machine: String) -> Bool {
+        ProcessInfo.processInfo.isiOSAppOnMac || machine.hasPrefix(Constants.realityDevicePrefix)
     }
 
     private static func getSysctlString(_ name: String) -> String {
@@ -317,8 +393,8 @@ public final class EmulatorDetector {
 
     private static func checkDeviceCheckUnsupported() -> Bool {
         if #available(iOS 11.0, *) {
-            if !DCDevice.current.isSupported {
-                logger.debug("DeviceCheck not supported — likely simulator")
+            if !DCDevice.current.isSupported, !ProcessInfo.processInfo.isiOSAppOnMac {
+                logger.debug(Constants.deviceCheckUnsupportedLog)
                 return true
             }
         }
@@ -336,7 +412,7 @@ public final class EmulatorDetector {
             uname(&systemInfo)
             let identifier = withUnsafePointer(to: &systemInfo.machine) {
                 $0.withMemoryRebound(to: CChar.self, capacity: 1) {
-                    String(validatingUTF8: $0) ?? "Unknown"
+                    String(validatingUTF8: $0) ?? Constants.unknownModel
                 }
             }
 

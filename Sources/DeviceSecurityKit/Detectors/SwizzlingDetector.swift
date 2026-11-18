@@ -11,8 +11,37 @@ import MachO
 import ObjectiveC
 
 public final class SwizzlingDetector {
+
+    private struct Constants {
+        static let loggerSubsystem = "SwizzlingDetector"
+        static let textSegment = "__TEXT"
+        static let swiftTypesSection = "__swift5_types"
+        static let swiftProtocolsSection = "__swift5_proto"
+
+        static func instanceLabel(_ className: String, _ selector: String) -> String {
+            "\(className).\(selector)"
+        }
+        static func classLabel(_ className: String, _ selector: String) -> String {
+            "+\(className).\(selector)"
+        }
+        static func unresolvedImage(_ label: String) -> String {
+            "Swizzle check: could not resolve image for \(label)"
+        }
+        static func swizzled(_ label: String, _ image: String) -> String {
+            "Method swizzling detected: \(label) → \(image)"
+        }
+        static func appMethodSwizzled(_ className: String, _ selector: String, _ image: String) -> String {
+            "App method swizzled: \(className).\(selector) → \(image)"
+        }
+        static func metadataEscapes(_ segment: String, _ section: String) -> String {
+            "DSK integrity: Swift metadata record in \(segment),\(section) resolves outside DSK's own image"
+        }
+        static func knownLibrary(_ name: String) -> String {
+            "Known swizzling library detected: \(name)"
+        }
+    }
     
-    private static let logger = SecurityLogger.security(subsystem: "SwizzlingDetector")
+    private static let logger = SecurityLogger.security(subsystem: Constants.loggerSubsystem)
     private static let o = StringObfuscator.shared
     
     public static func isSwizzled() -> Bool {
@@ -50,7 +79,6 @@ public final class SwizzlingDetector {
                 o.reveal([0x7C, 0x22, 0xEF, 0xE1, 0x0F, 0xEA, 0x39, 0x32, 0xC2, 0xFD, 0x9A, 0xE6,
                           0x87, 0xAB, 0x2E, 0xB1, 0x1C, 0xF5, 0x54, 0xAF, 0x66, 0x45])
             ),
-            // NSURLSession – dataTaskWithURL:completionHandler:
             (
                 o.reveal([0x9B, 0x20, 0x0B, 0x93, 0x17, 0xE9, 0x62, 0xF4, 0x63, 0xD3, 0x03, 0x3B, 0x90, 0x82, 0x2B, 0x57]),
                 o.reveal([0x7A, 0x81, 0xFB, 0xC7, 0x8A, 0xEA, 0xFC, 0x36, 0x70, 0x30, 0x20, 0xAA,
@@ -58,50 +86,41 @@ public final class SwizzlingDetector {
                           0x19, 0x49, 0xAA, 0xDC, 0xDA, 0xF7, 0x13, 0xE2, 0xE9, 0x93, 0x7F, 0x57,
                           0x26, 0xB6])
             ),
-            // NSFileManager – fileExistsAtPath: (jailbreak-detection bypass vector)
             (
                 o.reveal([0xE3, 0xBD, 0xAF, 0x8A, 0x11, 0xA5, 0x9D, 0xEB, 0xE9, 0x91, 0x47, 0xB5, 0x29, 0x99, 0x48, 0x59, 0xAA]),
                 o.reveal([0x55, 0x8A, 0xD7, 0x37, 0xC1, 0x3D, 0xC9, 0x5D, 0xC0, 0x36, 0x19, 0x91,
                           0x55, 0x28, 0x23, 0xC1, 0xB9, 0xC2, 0xFA, 0x2F, 0xA3])
             ),
-            // NSFileManager – isReadableFileAtPath: (jailbreak-detection bypass vector)
             (
                 o.reveal([0x8B, 0xC3, 0x71, 0xD0, 0xF5, 0xE3, 0x05, 0x61, 0x19, 0xDF, 0x47, 0x17, 0xAD, 0xA1, 0x96, 0x9F, 0xB6]),
                 o.reveal([0xA0, 0x3F, 0x49, 0x52, 0xD0, 0x20, 0x07, 0x8A, 0xCE, 0xB1, 0x6D, 0xF7,
                           0x93, 0x0F, 0xA4, 0xF4, 0x64, 0xB7, 0xC3, 0xE9, 0x0E, 0x22, 0xD9, 0xAA,
                           0x62])
             ),
-            // UIDevice – model (emulator / device-type detection bypass)
             (
                 o.reveal([0xAF, 0xF1, 0xE2, 0xBD, 0x51, 0x2E, 0x78, 0xCA, 0x60, 0x04, 0x8E, 0x6C]),
                 o.reveal([0x93, 0x50, 0xEC, 0xA5, 0x36, 0x5A, 0xFB, 0x38, 0x39])
             ),
-            // NSProcessInfo – environment (env-var detection bypass)
             (
                 o.reveal([0x99, 0x5B, 0x83, 0x43, 0x8A, 0xB7, 0x0E, 0x7A, 0xDD, 0x85, 0xE8, 0xC1, 0x8D, 0x0C, 0xD4, 0xCA, 0x31]),
                 o.reveal([0x9F, 0x96, 0xDF, 0x6E, 0xB9, 0xDC, 0x96, 0x07, 0x90, 0x53, 0xD1, 0x6D, 0x71, 0xE4, 0x8B])
             ),
-            // NSBundle – infoDictionary (integrity-check bypass)
             (
                 o.reveal([0x4A, 0xAA, 0xAF, 0x8C, 0x00, 0x6C, 0xAC, 0x92, 0x5E, 0x1D, 0x71, 0x5C]),
                 o.reveal([0x23, 0xF4, 0x4C, 0x7F, 0x20, 0x2B, 0xB7, 0xEE, 0x0B, 0x22, 0xE1, 0x6B, 0xF2, 0x59, 0x6E, 0xEA, 0xB4, 0xB3])
             ),
-            // NSUserDefaults – boolForKey: (feature-flag / kill-switch manipulation)
             (
                 o.reveal([0xC2, 0x90, 0x50, 0xFB, 0xAF, 0x35, 0x0C, 0x45, 0xC2, 0x06, 0x66, 0xA9, 0x9F, 0x97, 0xC4, 0x44, 0x02, 0x41]),
                 o.reveal([0xCF, 0x68, 0x88, 0x52, 0x00, 0x72, 0xC7, 0x35, 0x5E, 0xA4, 0xA7, 0x4C, 0x17, 0x50, 0xC1])
             ),
-            // UIScreen – isCaptured (screen-recording detection bypass)
             (
                 o.reveal([0x1C, 0xF7, 0x45, 0x01, 0xCB, 0x52, 0x17, 0x30, 0xEA, 0x00, 0x9A, 0x87]),
                 o.reveal([0xE2, 0x33, 0x44, 0x09, 0x3B, 0x09, 0x51, 0x47, 0x0C, 0xF8, 0xCE, 0xC6, 0x2F, 0x6E])
             ),
-            // LAContext – evaluatePolicy:localizedReason:reply: (biometric auth bypass)
             (
                 o.reveal([0x06, 0x41, 0x90, 0x0C, 0xA9, 0x0B, 0x7C, 0xF9, 0xB9, 0x3C, 0xE5, 0x4C, 0xEF]),
                 o.reveal([0xE7, 0xD1, 0x22, 0xDD, 0x21, 0xA9, 0xDD, 0x4B, 0x23, 0x44, 0x99, 0xE4, 0xCE, 0x93, 0x82, 0xB3, 0xE6, 0xF5, 0x24, 0x5E, 0xBA, 0x0F, 0xCB, 0x6A, 0x4D, 0xC5, 0x0A, 0xEC, 0x9A, 0xAD, 0x21, 0xEC, 0xF8, 0xC3, 0xF9, 0xCC, 0x18, 0x65, 0x3C, 0x1C, 0xDD])
             ),
-            // LAContext – canEvaluatePolicy:error: (biometric availability check bypass)
             (
                 o.reveal([0x06, 0x41, 0x90, 0x0C, 0xA9, 0x0B, 0x7C, 0xF9, 0xB9, 0x3C, 0xE5, 0x4C, 0xEF]),
                 o.reveal([0xFE, 0x5E, 0xED, 0x17, 0xF8, 0xD0, 0x6F, 0xA8, 0xC7, 0x82, 0xDC, 0x26, 0x02, 0xF5, 0xC0, 0xB8, 0xB0, 0x45, 0xDC, 0x3D, 0x87, 0x3F, 0xF5, 0xF3, 0xFF, 0xB8, 0xBD, 0x25])
@@ -114,7 +133,7 @@ public final class SwizzlingDetector {
             guard class_getInstanceMethod(cls, sel) != nil else { continue }
             guard let imp = class_getMethodImplementation(cls, sel) else { continue }
             
-            if impIsOutsideSystem(imp, label: "\(className).\(selName)") {
+            if impIsOutsideSystem(imp, label: Constants.instanceLabel(className, selName)) {
                 return true
             }
         }
@@ -133,7 +152,7 @@ public final class SwizzlingDetector {
             let sel = NSSelectorFromString(connSel)
             if class_getInstanceMethod(metaCls, sel) != nil,
                let imp = class_getMethodImplementation(metaCls, sel) {
-                if impIsOutsideSystem(imp, label: "+\(connClass).\(connSel)") {
+                if impIsOutsideSystem(imp, label: Constants.classLabel(connClass, connSel)) {
                     return true
                 }
             }
@@ -149,12 +168,12 @@ public final class SwizzlingDetector {
         let ptr = unsafeBitCast(imp, to: UnsafeRawPointer.self)
         var info = Dl_info()
         guard dladdr(ptr, &info) != 0, let fname = info.dli_fname else {
-            logger.warning("Swizzle check: could not resolve image for \(SecurityLogger.redact(label))")
+            logger.warning(Constants.unresolvedImage(SecurityLogger.redact(label)))
             return true
         }
         let imagePath = String(cString: fname)
         if !SystemImageValidator.shared.isSystemImage(imagePath) {
-            logger.warning("Method swizzling detected: \(SecurityLogger.redact(label)) → \(SecurityLogger.redact(imagePath))")
+            logger.warning(Constants.swizzled(SecurityLogger.redact(label), SecurityLogger.redact(imagePath)))
             return true
         }
         return false
@@ -193,11 +212,12 @@ public final class SwizzlingDetector {
                 let impImage = String(cString: fname)
                 
                 if impImage != appImagePath &&
-                    !SystemImageValidator.shared.isSystemImage(impImage) {
+                    !SystemImageValidator.shared.isSystemImage(impImage) &&
+                    SystemImageValidator.shared.pathRelativeToAppBundle(impImage) == nil {
                     let sel = method_getName(methods[j])
                     let className = NSStringFromClass(cls)
                     let selName = NSStringFromSelector(sel)
-                    logger.warning("App method swizzled: \(SecurityLogger.redact(className)).\(SecurityLogger.redact(selName)) → \(SecurityLogger.redact(impImage))")
+                    logger.warning(Constants.appMethodSwizzled(SecurityLogger.redact(className), SecurityLogger.redact(selName), SecurityLogger.redact(impImage)))
                     return true
                 }
             }
@@ -228,13 +248,13 @@ public final class SwizzlingDetector {
         let hdr64 = UnsafeRawPointer(hdr).assumingMemoryBound(to: mach_header_64.self)
         
         let metadataSections: [(segment: String, section: String)] = [
-            ("__TEXT", "__swift5_types"),
-            ("__TEXT", "__swift5_proto"),
+            (Constants.textSegment, Constants.swiftTypesSection),
+            (Constants.textSegment, Constants.swiftProtocolsSection),
         ]
         
         for (segment, section) in metadataSections {
             if sectionRecordsEscapeImage(hdr64: hdr64, segment: segment, section: section, dskImagePath: dskImagePath) {
-                logger.warning("DSK integrity: Swift metadata record in \(segment),\(section) resolves outside DSK's own image")
+                logger.warning(Constants.metadataEscapes(segment, section))
                 return true
             }
         }
@@ -287,7 +307,7 @@ public final class SwizzlingDetector {
             let imageName = String(cString: rawName).lowercased()
             for lib in suspiciousLibraries {
                 if imageName.contains(lib) {
-                    logger.warning("Known swizzling library detected: \(SecurityLogger.redact(imageName))")
+                    logger.warning(Constants.knownLibrary(SecurityLogger.redact(imageName)))
                     return true
                 }
             }

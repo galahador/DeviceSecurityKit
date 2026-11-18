@@ -11,15 +11,85 @@ import Darwin.C
 import MachO
 
 public final class DebuggerDetector {
+
+    private struct Constants {
+        static let loggerSubsystem = "DebuggerDetector"
+        static let denyAttachQueueLabel = "DebuggerDetector.denyAttach"
+
+        static let methodSysctl = "sysctl"
+        static let methodPtrace = "ptrace"
+        static let methodParentProcess = "parentProcess"
+        static let methodEnvironment = "environment"
+        static let methodTiming = "timing"
+        static let methodBreakpoint = "breakpoint"
+        static let methodTextIntegrity = "textIntegrity"
+        static let methodExceptionPorts = "exceptionPorts"
+        static let methodSeparator = ", "
+        static let listSeparator = ","
+
+        static let textSegment = "__TEXT"
+        static let textSection = "__text"
+
+        static let denyAttachStopped = "Continuous PT_DENY_ATTACH hardening stopped"
+        static let ptracedFlag = "P_TRACED flag detected via sysctl"
+        static let arm64Breakpoint = "ARM64 breakpoint instruction detected"
+        static let x86Breakpoint = "x86/x64 breakpoint instruction detected"
+        static let textIntegrityFailed = "Text segment integrity check failed — possible breakpoint insertion"
+
+        static func denyAttachStarted(_ interval: some CustomStringConvertible) -> String {
+            "Continuous PT_DENY_ATTACH hardening started (interval: \(interval)s)"
+        }
+        static func methodTriggered(_ method: String) -> String {
+            "Debugger detection method '\(method)' triggered"
+        }
+        static func attachedVia(_ methods: String) -> String {
+            "Debugger attachment detected via methods: \(methods)"
+        }
+        static func sysctlFailed(_ result: some CustomStringConvertible, _ errno: some CustomStringConvertible) -> String {
+            "sysctl failed with result: \(result), errno: \(errno)"
+        }
+        static func sysctlInsufficient(_ size: some CustomStringConvertible) -> String {
+            "sysctl returned insufficient data: \(size) bytes"
+        }
+        static func ptraceTriggered(_ errno: some CustomStringConvertible) -> String {
+            "ptrace detection triggered with errno: \(errno)"
+        }
+        static func invalidParentPid(_ pid: some CustomStringConvertible) -> String {
+            "Invalid parent PID: \(pid)"
+        }
+        static func parentInfoFailed(_ result: some CustomStringConvertible) -> String {
+            "Failed to get parent process info, sysctl returned: \(result)"
+        }
+        static func suspiciousParent(_ name: String) -> String {
+            "Suspicious parent process detected: \(name)"
+        }
+        static func suspiciousEnvVar(_ name: String, _ value: String) -> String {
+            "Suspicious environment variable detected: \(name)=\(value)"
+        }
+        static func timingExceeded(_ ratio: some CustomStringConvertible) -> String {
+            "Timing analysis: test/baseline ratio \(ratio)x exceeds threshold"
+        }
+        static func exceptionPortsFailed(_ result: some CustomStringConvertible) -> String {
+            "task_get_exception_ports failed with result: \(result)"
+        }
+        static func exceptionPortSignature(_ mask: some CustomStringConvertible, _ behavior: some CustomStringConvertible, _ flavor: some CustomStringConvertible) -> String {
+            "\(mask):\(behavior):\(flavor)"
+        }
+        static func newExceptionPort(_ signatures: String) -> String {
+            "New exception port handler detected: \(signatures)"
+        }
+    }
     
     // MARK: - Public
     public static var timingThreshold: UInt64 = 10
 
     // MARK: - Private Properties
-    private static let logger = SecurityLogger.security(subsystem: "DebuggerDetector")
+    private static let logger = SecurityLogger.security(subsystem: Constants.loggerSubsystem)
     private static let debuggerDetectorList = DebuggerDetectorList()
-    private static let denyAttachQueue = DispatchQueue(label: "DebuggerDetector.denyAttach", qos: .background)
+    private static let denyAttachQueue = DispatchQueue(label: Constants.denyAttachQueueLabel, qos: .background)
     private static var denyAttachTimer: DispatchSourceTimer?
+    private static let exceptionPortLock = NSLock()
+    private static var exceptionPortBaseline: Set<String>?
     
     // MARK: - Continuous PT_DENY_ATTACH Hardening
     public static func startContinuousDenyAttach(interval: TimeInterval = 1.0) {
@@ -36,7 +106,7 @@ public final class DebuggerDetector {
             timer.resume()
             denyAttachTimer = timer
         }
-        logger.debug("Continuous PT_DENY_ATTACH hardening started (interval: \(interval)s)")
+        logger.debug(Constants.denyAttachStarted(interval))
 #endif
     }
 
@@ -46,34 +116,34 @@ public final class DebuggerDetector {
             denyAttachTimer?.cancel()
             denyAttachTimer = nil
         }
-        logger.debug("Continuous PT_DENY_ATTACH hardening stopped")
+        logger.debug(Constants.denyAttachStopped)
 #endif
     }
     
     public static func isDebuggerAttached() -> Bool {
         let detectionResults = [
-            ("sysctl", checkDebuggerWithSysctl()),
-            ("ptrace", checkDebuggerWithPtrace()),
-            ("parentProcess", checkDebuggerWithGetppid()),
-            ("environment", checkDebuggerEnvironment()),
-            ("timing", checkTimingAnalysis()),
-            ("breakpoint", checkBreakpointDetection()),
-            ("textIntegrity", checkTextSegmentIntegrity()),
-            ("exceptionPorts", checkExceptionPorts())
+            (Constants.methodSysctl, checkDebuggerWithSysctl()),
+            (Constants.methodPtrace, checkDebuggerWithPtrace()),
+            (Constants.methodParentProcess, checkDebuggerWithGetppid()),
+            (Constants.methodEnvironment, checkDebuggerEnvironment()),
+            (Constants.methodTiming, checkTimingAnalysis()),
+            (Constants.methodBreakpoint, checkBreakpointDetection()),
+            (Constants.methodTextIntegrity, checkTextSegmentIntegrity()),
+            (Constants.methodExceptionPorts, checkExceptionPorts())
         ]
 
 #if DEBUG
         for (method, detected) in detectionResults {
             if detected {
-                logger.debug("Debugger detection method '\(method)' triggered")
+                logger.debug(Constants.methodTriggered(method))
             }
         }
         return false
 #else
         let isAttached = detectionResults.contains { $0.1 }
         if isAttached {
-            let triggeredMethods = detectionResults.compactMap { $0.1 ? $0.0 : nil }.joined(separator: ", ")
-            logger.warning("Debugger attachment detected via methods: \(triggeredMethods)")
+            let triggeredMethods = detectionResults.compactMap { $0.1 ? $0.0 : nil }.joined(separator: Constants.methodSeparator)
+            logger.warning(Constants.attachedVia(triggeredMethods))
         }
         return isAttached
 #endif
@@ -81,14 +151,14 @@ public final class DebuggerDetector {
     
     public static func getDetectionResults() -> [String: Bool] {
         return [
-            "sysctl": checkDebuggerWithSysctl(),
-            "ptrace": checkDebuggerWithPtrace(),
-            "parentProcess": checkDebuggerWithGetppid(),
-            "environment": checkDebuggerEnvironment(),
-            "timing": checkTimingAnalysis(),
-            "breakpoint": checkBreakpointDetection(),
-            "textIntegrity": checkTextSegmentIntegrity(),
-            "exceptionPorts": checkExceptionPorts()
+            Constants.methodSysctl: checkDebuggerWithSysctl(),
+            Constants.methodPtrace: checkDebuggerWithPtrace(),
+            Constants.methodParentProcess: checkDebuggerWithGetppid(),
+            Constants.methodEnvironment: checkDebuggerEnvironment(),
+            Constants.methodTiming: checkTimingAnalysis(),
+            Constants.methodBreakpoint: checkBreakpointDetection(),
+            Constants.methodTextIntegrity: checkTextSegmentIntegrity(),
+            Constants.methodExceptionPorts: checkExceptionPorts()
         ]
     }
     
@@ -100,18 +170,18 @@ public final class DebuggerDetector {
         let result = sysctl(&mib, UInt32(mib.count), &info, &size, nil, 0)
         
         guard result == 0 else {
-            logger.error("sysctl failed with result: \(result), errno: \(errno)")
+            logger.error(Constants.sysctlFailed(result, errno))
             return false
         }
         
         guard size >= MemoryLayout<kinfo_proc>.stride else {
-            logger.error("sysctl returned insufficient data: \(size) bytes")
+            logger.error(Constants.sysctlInsufficient(size))
             return false
         }
         
         let isTraced = (info.kp_proc.p_flag & P_TRACED) != 0
         if isTraced {
-            logger.info("P_TRACED flag detected via sysctl")
+            logger.info(Constants.ptracedFlag)
         }
         
         return isTraced
@@ -131,7 +201,7 @@ public final class DebuggerDetector {
         
         let detected = result == -1 && ptraceErrno == EBUSY
         if detected {
-            logger.info("ptrace detection triggered with errno: \(ptraceErrno)")
+            logger.info(Constants.ptraceTriggered(ptraceErrno))
         }
         
         return detected
@@ -144,7 +214,7 @@ public final class DebuggerDetector {
         let parentPid = getppid()
         
         guard parentPid > 0 else {
-            logger.error("Invalid parent PID: \(parentPid)")
+            logger.error(Constants.invalidParentPid(parentPid))
             return false
         }
         
@@ -155,7 +225,7 @@ public final class DebuggerDetector {
         let result = sysctl(&mib, UInt32(mib.count), &info, &size, nil, 0)
         
         guard result == 0 else {
-            logger.error("Failed to get parent process info, sysctl returned: \(result)")
+            logger.error(Constants.parentInfoFailed(result))
             return false
         }
         
@@ -166,7 +236,7 @@ public final class DebuggerDetector {
         
         let detected = debuggerDetectorList.suspiciousNames.contains(processName.lowercased())
         if detected {
-            logger.info("Suspicious parent process detected: \(SecurityLogger.redact(processName))")
+            logger.info(Constants.suspiciousParent(SecurityLogger.redact(processName)))
         }
         
         return detected
@@ -176,7 +246,7 @@ public final class DebuggerDetector {
         for envVar in debuggerDetectorList.suspiciousEnvVars {
             if let value = getenv(envVar) {
                 let envValue = String(cString: value)
-                logger.info("Suspicious environment variable detected: \(SecurityLogger.redact(envVar))=\(SecurityLogger.redact(envValue))")
+                logger.info(Constants.suspiciousEnvVar(SecurityLogger.redact(envVar), SecurityLogger.redact(envValue)))
                 return true
             }
         }
@@ -226,7 +296,7 @@ public final class DebuggerDetector {
 
         let detected = ratio > timingThreshold
         if detected {
-            logger.info("Timing analysis: test/baseline ratio \(ratio)x exceeds threshold")
+            logger.info(Constants.timingExceeded(ratio))
         }
         return detected
 #else
@@ -252,17 +322,17 @@ public final class DebuggerDetector {
             for i in 0..<scanDepth {
                 let instr = instructions.advanced(by: i).pointee
                 
-                if (instr & 0xFFE0001F) == 0xD4200000 {
-                    logger.info("ARM64 breakpoint instruction detected")
+                if instr == 0xD4200000 {
+                    logger.info(Constants.arm64Breakpoint)
                     return true
                 }
-                if instr == 0xD65F03C0 { break }
+                if instr == 0xD65F03C0 || instr == 0xD65F0FFF || instr == 0xD65F0BFF { break }
             }
 #else
             let bytes = funcPtr.assumingMemoryBound(to: UInt8.self)
             for i in 0..<scanDepth {
                 if bytes.advanced(by: i).pointee == 0xCC {
-                    logger.info("x86/x64 breakpoint instruction detected")
+                    logger.info(Constants.x86Breakpoint)
                     return true
                 }
                 if bytes.advanced(by: i).pointee == 0xC3 { break }
@@ -283,7 +353,7 @@ public final class DebuggerDetector {
         guard let header = _dyld_get_image_header(0) else { return false }
         var size: UInt = 0
         guard let section = header.withMemoryRebound(to: mach_header_64.self, capacity: 1, {
-            getsectiondata($0, "__TEXT", "__text", &size)
+            getsectiondata($0, Constants.textSegment, Constants.textSection, &size)
         }) else { return false }
         guard size > 0 else { return false }
 
@@ -307,7 +377,7 @@ public final class DebuggerDetector {
         }
 
         if sum1 != sum2 {
-            logger.info("Text segment integrity check failed — possible breakpoint insertion")
+            logger.info(Constants.textIntegrityFailed)
             return true
         }
 
@@ -344,26 +414,38 @@ public final class DebuggerDetector {
         )
 
         guard result == KERN_SUCCESS else {
-            logger.error("task_get_exception_ports failed with result: \(result)")
+            logger.error(Constants.exceptionPortsFailed(result))
             return false
         }
 
-        var hijacked = false
+        var signatures = Set<String>()
         for i in 0..<Int(maskCount) {
             if ports[i] != mach_port_t(MACH_PORT_NULL) {
-                if !hijacked {
-                    logger.info("Custom exception port handler detected at index \(i)")
-                    hijacked = true
-                }
+                signatures.insert(Constants.exceptionPortSignature(masks[i], behaviors[i], flavors[i]))
                 mach_port_deallocate(mach_task_self_, ports[i])
             }
         }
 
-        return hijacked
+        exceptionPortLock.lock()
+        defer { exceptionPortLock.unlock() }
+        guard let baseline = exceptionPortBaseline else {
+            exceptionPortBaseline = signatures
+            return false
+        }
+
+        let added = signatures.subtracting(baseline)
+        if !added.isEmpty {
+            logger.info(Constants.newExceptionPort(added.sorted().joined(separator: Constants.listSeparator)))
+        }
+        return !added.isEmpty
 #else
         return false
 #endif
     }
+}
+
+private struct PtraceConstants {
+    static let symbol = "ptrace"
 }
 
 private func ptrace(_ request: Int32, _ pid: pid_t, _ addr: UnsafeMutableRawPointer?, _ data: Int32) -> Int32 {
@@ -374,7 +456,7 @@ private func ptrace(_ request: Int32, _ pid: pid_t, _ addr: UnsafeMutableRawPoin
     }
     defer { dlclose(handle) }
     
-    guard let sym = dlsym(handle, "ptrace") else {
+    guard let sym = dlsym(handle, PtraceConstants.symbol) else {
         return -1
     }
     
