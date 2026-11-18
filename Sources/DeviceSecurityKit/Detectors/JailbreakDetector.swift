@@ -11,10 +11,37 @@ import Darwin
 import MachO
 
 public final class JailbreakDetector {
+
+    private struct Constants {
+        static let loggerSubsystem = "JailbreakDetector"
+
+        static let dyldPrefix = "DYLD_"
+        static let prebootMarker = "preboot"
+        static let jailbreakRootMarker = "/var/jb"
+        static let jailbreakMarkerFile = "jb"
+        static let forkSymbol = "fork"
+        static let sandboxProbeContent = "test"
+
+        static let evidenceSandboxEscape = "sandboxEscapeWritable"
+        static let evidenceForkSucceeded = "forkSucceeded"
+
+        static let urlSchemeCheckSkipped = "URL scheme check skipped — checker unavailable (simulator, or LSApplicationQueriesSchemes not configured in Info.plist)"
+        static let antiDetectionTweakLog = "Anti-jailbreak-detection tweak detected in loaded images"
+
+        static func suspiciousPath(_ path: String) -> String { "suspiciousPath(\"\(path)\")" }
+        static func urlSchemeResponds(_ scheme: String) -> String { "urlSchemeResponds(\"\(scheme)\")" }
+        static func symbolicLink(_ path: String) -> String { "symbolicLink(\"\(path)\")" }
+        static func envVarEvidence(_ name: String) -> String { "envVar(\"\(name)\")" }
+        static func antiDetectionTool(_ path: String) -> String { "antiDetectionTool(\"\(path)\")" }
+        static func prebootPathEvidence(_ path: String) -> String { "prebootPath(\"\(path)\")" }
+        static func prebootJailbreakPath(_ preboot: String, _ entry: String) -> String {
+            "\(preboot)/\(entry)/\(jailbreakMarkerFile)"
+        }
+    }
     
     // MARK: - Private Properties
     private static let jailbreakListOptions = JailbreakListOptions()
-    private static let logger = SecurityLogger.security(subsystem: "JailbreakDetector")
+    private static let logger = SecurityLogger.security(subsystem: Constants.loggerSubsystem)
     
     // MARK: - URL Scheme Checker
     private static let _urlSchemeChecker: ((URL) -> Bool)? = defaultURLSchemeChecker()
@@ -52,8 +79,8 @@ public final class JailbreakDetector {
     public static func getDetectionDetails() -> [String] {
         var evidence: [String] = []
         evidence.append(contentsOf: collectFileEvidence())
-        if checkSandboxIntegrity()  { evidence.append("sandboxEscapeWritable") }
-        if checkForkCapability()    { evidence.append("forkSucceeded") }
+        if checkSandboxIntegrity()  { evidence.append(Constants.evidenceSandboxEscape) }
+        if checkForkCapability()    { evidence.append(Constants.evidenceForkSucceeded) }
         evidence.append(contentsOf: collectURLSchemeEvidence())
         evidence.append(contentsOf: collectSymlinkEvidence())
         evidence.append(contentsOf: collectEnvVarEvidence())
@@ -68,7 +95,7 @@ public final class JailbreakDetector {
         var found: [String] = []
         for path in jailbreakListOptions.suspiciousPaths {
             if FileManager.default.fileExists(atPath: path) || FileManager.default.isReadableFile(atPath: path) {
-                found.append("suspiciousPath(\"\(path)\")")
+                found.append(Constants.suspiciousPath(path))
             }
         }
         return found
@@ -79,7 +106,7 @@ public final class JailbreakDetector {
         var found: [String] = []
         for scheme in jailbreakListOptions.urlSchemes {
             if let url = URL(string: scheme), checker(url) {
-                found.append("urlSchemeResponds(\"\(scheme)\")")
+                found.append(Constants.urlSchemeResponds(scheme))
             }
         }
         return found
@@ -91,7 +118,7 @@ public final class JailbreakDetector {
             if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
                let fileType = attrs[.type] as? FileAttributeType,
                fileType == .typeSymbolicLink {
-                found.append("symbolicLink(\"\(path)\")")
+                found.append(Constants.symbolicLink(path))
             }
         }
         return found
@@ -103,8 +130,8 @@ public final class JailbreakDetector {
 #else
         var found: [String] = []
         for envVar in jailbreakListOptions.suspiciousVars {
-            if getenv(envVar) != nil {
-                found.append("envVar(\"\(envVar)\")")
+            if isSuspiciousEnvVar(envVar) {
+                found.append(Constants.envVarEvidence(envVar))
             }
         }
         return found
@@ -118,7 +145,7 @@ public final class JailbreakDetector {
             guard let rawName = _dyld_get_image_name(i) else { continue }
             let path = String(cString: rawName).lowercased()
             for marker in jailbreakListOptions.antiDetectionToolMarkers where path.contains(marker) {
-                found.append("antiDetectionTool(\"\(path)\")")
+                found.append(Constants.antiDetectionTool(path))
             }
         }
         return found
@@ -127,12 +154,20 @@ public final class JailbreakDetector {
     private static func collectPrebootEvidence() -> [String] {
         var found: [String] = []
         for path in jailbreakListOptions.suspiciousPaths {
-            guard path.contains("preboot") || path.contains("/var/jb") else { continue }
+            guard path.contains(Constants.prebootMarker) || path.contains(Constants.jailbreakRootMarker) else { continue }
             if FileManager.default.fileExists(atPath: path) {
-                found.append("prebootPath(\"\(path)\")")
+                found.append(Constants.prebootPathEvidence(path))
             }
         }
         return found
+    }
+
+    private static func isSuspiciousEnvVar(_ name: String) -> Bool {
+        guard let raw = getenv(name) else { return false }
+        if name.hasPrefix(Constants.dyldPrefix) && SystemImageValidator.shared.isBenignDyldValue(String(cString: raw)) {
+            return false
+        }
+        return true
     }
 
     // MARK: - Private Detection Methods
@@ -154,7 +189,7 @@ public final class JailbreakDetector {
     private static func checkSandboxIntegrity() -> Bool {
         for testPath in jailbreakListOptions.testPaths {
             do {
-                try "test".write(toFile: testPath, atomically: true, encoding: .utf8)
+                try Constants.sandboxProbeContent.write(toFile: testPath, atomically: true, encoding: .utf8)
                 try? FileManager.default.removeItem(atPath: testPath)
                 return true
             } catch {
@@ -167,7 +202,7 @@ public final class JailbreakDetector {
     
     private static func checkSuspiciousURLSchemes() -> Bool {
         guard let checker = _urlSchemeChecker else {
-            logger.debug("URL scheme check skipped — checker unavailable (simulator, or LSApplicationQueriesSchemes not configured in Info.plist)")
+            logger.debug(Constants.urlSchemeCheckSkipped)
             return false
         }
         
@@ -201,7 +236,7 @@ public final class JailbreakDetector {
         return false
 #else
         for envVar in jailbreakListOptions.suspiciousVars {
-            if getenv(envVar) != nil {
+            if isSuspiciousEnvVar(envVar) {
                 return true
             }
         }
@@ -215,7 +250,7 @@ public final class JailbreakDetector {
 
         guard let handle = dlopen(nil, RTLD_NOW) else { return false }
         defer { dlclose(handle) }
-        guard let sym = dlsym(handle, "fork") else { return false }
+        guard let sym = dlsym(handle, Constants.forkSymbol) else { return false }
 
         let forkFn = unsafeBitCast(sym, to: ForkType.self)
         let pid = forkFn()
@@ -243,7 +278,7 @@ public final class JailbreakDetector {
             return false
         }
         for entry in entries {
-            let jbPath = "\(prebootPath)/\(entry)/jb"
+            let jbPath = Constants.prebootJailbreakPath(prebootPath, entry)
             if FileManager.default.fileExists(atPath: jbPath)
                 || FileManager.default.isReadableFile(atPath: jbPath) {
                 return true
@@ -258,7 +293,7 @@ public final class JailbreakDetector {
             guard let rawName = _dyld_get_image_name(i) else { continue }
             let path = String(cString: rawName).lowercased()
             for marker in jailbreakListOptions.antiDetectionToolMarkers where path.contains(marker) {
-                logger.warning("Anti-jailbreak-detection tweak detected in loaded images")
+                logger.warning(Constants.antiDetectionTweakLog)
                 return true
             }
         }

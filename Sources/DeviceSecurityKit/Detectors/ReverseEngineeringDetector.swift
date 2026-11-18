@@ -11,9 +11,19 @@ import MachO
 
 public final class ReverseEngineeringDetector {
 
+    private struct Constants {
+        static let loggerSubsystem = "ReverseEngineeringDetector"
+        static let systemLibraryPrefix = "/System/Library/"
+        static let dyldPrefix = "DYLD_"
+
+        static func instrumentationClass(_ name: String) -> String {
+            "Instrumentation class detected: \(name)"
+        }
+    }
+
     // MARK: - Private Properties
     private static let reverseEngineeringListsOptions = ReverseEngineeringListsOptions()
-    private static let logger = SecurityLogger.security(subsystem: "ReverseEngineeringDetector")
+    private static let logger = SecurityLogger.security(subsystem: Constants.loggerSubsystem)
 
     // MARK: - Public
     public static func isReverseEngineered() -> Bool {
@@ -39,7 +49,10 @@ public final class ReverseEngineeringDetector {
         
         for i in 0..<maxImages {
             guard let imageName = _dyld_get_image_name(i) else { continue }
-            let name = String(cString: imageName)
+            if i == 0 { continue }
+            let rawName = String(cString: imageName)
+            if rawName.hasPrefix(Constants.systemLibraryPrefix) { continue }
+            let name = SystemImageValidator.shared.pathRelativeToAppBundle(rawName) ?? rawName
             
             if name.lowercased().contains(libraryName.lowercased()) {
                 return true
@@ -54,7 +67,8 @@ public final class ReverseEngineeringDetector {
         return false
 #else
         for varName in reverseEngineeringListsOptions.suspiciousVars {
-            if let value = getenv(varName), String(cString: value).count > 0 {
+            if let value = getenv(varName), String(cString: value).count > 0,
+               !(varName.hasPrefix(Constants.dyldPrefix) && SystemImageValidator.shared.isBenignDyldValue(String(cString: value))) {
                 return true
             }
         }
@@ -85,7 +99,7 @@ public final class ReverseEngineeringDetector {
 
         for prefix in suspiciousClassPrefixes {
             if NSClassFromString(prefix) != nil {
-                logger.warning("Instrumentation class detected: \(SecurityLogger.redact(prefix))")
+                logger.warning(Constants.instrumentationClass(SecurityLogger.redact(prefix)))
                 return true
             }
         }
@@ -100,7 +114,7 @@ public final class ReverseEngineeringDetector {
         
 #if os(iOS) && !targetEnvironment(simulator)
         let bundlePath = Bundle.main.bundlePath
-        if !validBundlePrefixes.contains(where: { bundlePath.hasPrefix($0) }) {
+        if !ProcessInfo.processInfo.isiOSAppOnMac, !validBundlePrefixes.contains(where: { bundlePath.hasPrefix($0) }) {
             return true
         }
 #endif
